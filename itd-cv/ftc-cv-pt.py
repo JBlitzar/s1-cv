@@ -1,5 +1,5 @@
 # /// script
-# requires-python = ">=3.13"
+# requires-python = ">=3.11"
 # dependencies = [
 #     "numpy",
 #     "pillow",
@@ -91,3 +91,10 @@ for epoch in trange(10):
         loss.backward()
         optimizer.step()
         print(f"Epoch {epoch}, Loss: {loss.item()}")
+
+new_data = transforms(Image.open("data/val-image-3.png")).unsqueeze(0)
+pred = net(new_data)
+pred = pred.squeeze(0).squeeze(0).detach().numpy()
+print(pred.shape)
+pred = (pred * 255).astype("uint8")  # ugh average imageio
+Image.fromarray(pred).save("prediction.png")
