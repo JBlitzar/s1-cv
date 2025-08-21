@@ -13,8 +13,6 @@ import torch.nn as nn
 import torch.nn.functional as F
 from torch.utils.data import Dataset, DataLoader
 from PIL import Image
-from typing import List, Tuple, Dict, Union, Optional, Any, Callable
-import os
 
 
 class PixelWiseColorRegression(nn.Module):
