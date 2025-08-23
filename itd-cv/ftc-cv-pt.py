@@ -29,61 +29,80 @@ class PixelWiseColorRegression(nn.Module):
         return F.sigmoid(torch.sum(x * self.p, dim=1, keepdim=True) + self.b)
 
 
-class PixelWiseHSVRegression(nn.Module):
+class PixelWiseSinosodialRegression(nn.Module):
     def __init__(self):
         super().__init__()
 
         self.w = nn.Parameter(torch.randn(4, 1, 1))
         self.b = nn.Parameter(torch.randn(1, 1))
 
-    def rgb_to_hsv_cos_sin(self, x):
-        R, G, B = x[:, 0], x[:, 1], x[:, 2]
-
-        Cmax = torch.max(x, dim=1).values
-        Cmin = torch.min(x, dim=1).values
-        delta = Cmax - Cmin + 1e-6
-
-        H = torch.zeros_like(R)
-        mask = Cmax == R
-        H[mask] = ((G - B) / delta)[mask] % 6
-        mask = Cmax == G
-        H[mask] = ((B - R) / delta + 2)[mask]
-        mask = Cmax == B
-        H[mask] = ((R - G) / delta + 4)[mask]
-        H = H * (torch.pi / 3)
-
-        S = delta / (Cmax + 1e-6)
-
-        V = Cmax
-
-        H_cos = torch.cos(H)
-        H_sin = torch.sin(H)
-
-        return torch.stack([H_cos, H_sin, S, V], dim=1)
-
     def forward(self, x):
-        hsv_feat = self.rgb_to_hsv_cos_sin(x)
+        # batch, (h, s, v), width, height
+        # sin and cos of h, s, and v.
+        h = x[:, 0:1, :, :]
+        s = x[:, 1:2, :, :]
+        v = x[:, 2:3, :, :]
+
+        hsv_feat = torch.cat([torch.sin(h), torch.cos(h), s, v], dim=1)
+
         out = torch.sum(hsv_feat * self.w, dim=1, keepdim=True) + self.b
         out = torch.sigmoid(out)
         return out
 
 
+class SinosodialOneLayerCnn(nn.Module):
+    def __init__(self):
+        super().__init__()
+
+        self.w = nn.Parameter(torch.randn(4, 1, 1))
+        self.b = nn.Parameter(torch.randn(1, 1))
+
+        self.conv = nn.Conv2d(4, 4, kernel_size=3, padding=1)
+
+    def forward(self, x):
+        # batch, (h, s, v), width, height
+        # sin and cos of h, s, and v.
+        h = x[:, 0:1, :, :]
+        s = x[:, 1:2, :, :]
+        v = x[:, 2:3, :, :]
+
+        hsv_feat = torch.cat([torch.sin(h), torch.cos(h), s, v], dim=1)
+
+        feat = self.conv(hsv_feat)
+
+        out = torch.sum(feat * self.w, dim=1, keepdim=True) + self.b
+
+        out = torch.sigmoid(out)
+        return out
+
+
 import glob
+import os
 
 real_images = []
 mask_images = []
-for file in glob.glob("data/task-*.png"):
-    if "annotation" in file:
+for file in glob.glob("data/*.png"):
+    if "-" in file:
         continue
     else:
-        real_images.append(file)
-        n = int(file.split("-")[1].split(".png")[0])
-        mask_images.append(file.replace(".png", f"-annotation-{n}-by-1-tag-blue-0.png"))
+        n = int(file.split("/")[1].split(".png")[0])
+        mask_file = file.replace(".png", f"-blue.png")
+
+        if os.path.exists(mask_file):
+            real_images.append(file)
+            mask_images.append(mask_file)
 
 from torchvision.transforms import v2
 
+
+def rgbToHsvTransform(image):
+    image = image.convert("HSV")
+    return image
+
+
 transforms = v2.Compose(
     [
+        rgbToHsvTransform,
         v2.ToImage(),
         v2.ToDtype(torch.float32, scale=True),
     ]
@@ -118,7 +137,7 @@ dset = MyDataset(transforms, real_images, mask_images)
 loader = DataLoader(dset, batch_size=1, shuffle=True)
 from tqdm import trange
 
-net = PixelWiseHSVRegression()
+net = SinosodialOneLayerCnn()
 optimizer = torch.optim.Adam(net.parameters(), lr=1e-3)
 criterion = nn.MSELoss()
 
