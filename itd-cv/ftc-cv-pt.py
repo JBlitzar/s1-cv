@@ -29,6 +29,45 @@ class PixelWiseColorRegression(nn.Module):
         return F.sigmoid(torch.sum(x * self.p, dim=1, keepdim=True) + self.b)
 
 
+class PixelWiseHSVRegression(nn.Module):
+    def __init__(self):
+        super().__init__()
+
+        self.w = nn.Parameter(torch.randn(4, 1, 1))
+        self.b = nn.Parameter(torch.randn(1, 1))
+
+    def rgb_to_hsv_cos_sin(self, x):
+        R, G, B = x[:, 0], x[:, 1], x[:, 2]
+
+        Cmax = torch.max(x, dim=1).values
+        Cmin = torch.min(x, dim=1).values
+        delta = Cmax - Cmin + 1e-6
+
+        H = torch.zeros_like(R)
+        mask = Cmax == R
+        H[mask] = ((G - B) / delta)[mask] % 6
+        mask = Cmax == G
+        H[mask] = ((B - R) / delta + 2)[mask]
+        mask = Cmax == B
+        H[mask] = ((R - G) / delta + 4)[mask]
+        H = H * (torch.pi / 3)
+
+        S = delta / (Cmax + 1e-6)
+
+        V = Cmax
+
+        H_cos = torch.cos(H)
+        H_sin = torch.sin(H)
+
+        return torch.stack([H_cos, H_sin, S, V], dim=1)
+
+    def forward(self, x):
+        hsv_feat = self.rgb_to_hsv_cos_sin(x)
+        out = torch.sum(hsv_feat * self.w, dim=1, keepdim=True) + self.b
+        out = torch.sigmoid(out)
+        return out
+
+
 import glob
 
 real_images = []
@@ -79,7 +118,7 @@ dset = MyDataset(transforms, real_images, mask_images)
 loader = DataLoader(dset, batch_size=1, shuffle=True)
 from tqdm import trange
 
-net = PixelWiseColorRegression(3)
+net = PixelWiseHSVRegression()
 optimizer = torch.optim.Adam(net.parameters(), lr=1e-3)
 criterion = nn.MSELoss()
 
