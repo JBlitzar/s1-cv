@@ -28,6 +28,7 @@ if img.shape[2] == 4:
 
 
 # Claude Sonnet 4 via github copilot used to refactor `oop.py` into the file seen here (faster I guess, less oop.)
+# prompt used: eliminate the pixel class and instead operate on rows of pixels at a time. So store energies in a numpy array, cumulative energies in a numpy array, and parents in a numpy array
 class PixelGrid:
     def __init__(self, img, energies=None):
         if energies is None:

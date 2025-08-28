@@ -28,6 +28,7 @@ if img.shape[2] == 4:
 
 
 # Claude Sonnet 4 via github copilot used to refactor `oop.py` into the file seen here (faster I guess, less oop.)
+# prompt used: eliminate the pixel class and instead operate on rows of pixels at a time. So store energies in a numpy array, cumulative energies in a numpy array, and parents in a numpy array
 class PixelGrid:
     def __init__(self, img, energies=None):
         if energies is None:
@@ -107,10 +108,21 @@ grid.populate()
 grid.visualize()
 new = grid.remove_seam()
 
+desired_width = img.shape[1] // 2
+
 cur = new
-for i in trange(500):
+for i in trange(img.shape[1] - desired_width):
     grid = PixelGrid(cur)
     grid.populate()
     cur = grid.remove_seam()
+
+# rotate 90
+cur = np.rot90(cur, 1, (0, 1))
+for i in trange(cur.shape[1] - cur.shape[1] // 2):
+    grid = PixelGrid(cur)
+    grid.populate()
+    cur = grid.remove_seam()
+
+cur = np.rot90(cur, 3, (0, 1))
 
 save(cur)
