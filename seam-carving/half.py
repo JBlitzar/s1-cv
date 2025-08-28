@@ -83,7 +83,7 @@ class PixelGrid:
         img2 = self.img.copy()
         for x, y in self.seam:
             img2[y, x] = [255, 0, 255]
-        save(img2)
+        # save(img2)
 
     def remove_seam(self):
         # Create new image without the seam
@@ -98,7 +98,7 @@ class PixelGrid:
             # Copy pixels after seam
             new_img[y, seam_x:] = self.img[y, seam_x + 1 :]
 
-        save(new_img)
+        # save(new_img)
         return new_img
 
 
@@ -111,5 +111,6 @@ cur = new
 for i in trange(500):
     grid = PixelGrid(cur)
     grid.populate()
-    grid.visualize()
     cur = grid.remove_seam()
+
+save(cur)
