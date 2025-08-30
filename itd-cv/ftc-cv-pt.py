@@ -13,6 +13,9 @@ import torch.nn as nn
 import torch.nn.functional as F
 from torch.utils.data import Dataset, DataLoader
 from PIL import Image
+import os
+
+os.system(f"caffeinate -is -w {os.getpid()} &")
 
 
 class PixelWiseColorRegression(nn.Module):
@@ -37,56 +40,13 @@ class GenericColorPipeline(nn.Module):
         # r*rp + g * gp + b * bp + bias added together
         # weight of size channels * thing + bias
         self.p = nn.Parameter(torch.randn(channels, 1, 1))
+
         self.b = nn.Parameter(torch.randn(1, 1))
 
-        self.erosion_amount = nn.Parameter(torch.randn(1, 1))
-        self.dilation_amount = nn.Parameter(torch.randn(1, 1))
-
-    # From https://stackoverflow.com/questions/56235733/is-there-a-tensor-operation-or-function-in-pytorch-that-works-like-cv2-dilate
-    @staticmethod
-    def dilation_pytorch(image, strel, origin=(0, 0), border_value=0):
-        image_pad = F.pad(
-            image,
-            [
-                origin[0],
-                strel.shape[0] - origin[0] - 1,
-                origin[1],
-                strel.shape[1] - origin[1] - 1,
-            ],
-            mode="constant",
-            value=border_value,
-        )
-        image_unfold = F.unfold(
-            image_pad.unsqueeze(0).unsqueeze(0), kernel_size=strel.shape
-        )
-        strel_flatten = torch.flatten(strel).unsqueeze(0).unsqueeze(-1)
-        sums = image_unfold + strel_flatten
-        result, _ = sums.max(dim=1)
-        return torch.reshape(result, image.shape)
-
-    @staticmethod
-    def erosion_pytorch(image, strel, origin=(0, 0), border_value=0):
-        image_pad = F.pad(
-            image,
-            [
-                origin[0],
-                strel.shape[0] - origin[0] - 1,
-                origin[1],
-                strel.shape[1] - origin[1] - 1,
-            ],
-            mode="constant",
-            value=border_value,
-        )
-        image_unfold = F.unfold(
-            image_pad.unsqueeze(0).unsqueeze(0), kernel_size=strel.shape
-        )
-        strel_flatten = torch.flatten(strel).unsqueeze(0).unsqueeze(-1)
-        sums = image_unfold + strel_flatten
-        result, _ = sums.min(dim=1)
-        return torch.reshape(result, image.shape)
-
     def forward(self, x):
-        x = F.sigmoid(torch.sum(x * self.p, dim=1, keepdim=True) + self.b)
+        x = x * self.p
+
+        x = F.sigmoid(torch.sum(x, dim=1, keepdim=True) + self.b)
 
         x = x.repeat(1, 3, 1, 1)
 
@@ -135,11 +95,11 @@ class MyDataset(Dataset):
 
     def __getitem__(self, idx):
         img_path = self.files[idx]
-        image = Image.open(img_path)
+        image = Image.open(img_path).convert("RGB")  # Remove alpha channel
         if self.transform:
             image = self.transform(image)
 
-        mask = Image.open(self.masks[idx])
+        mask = Image.open(self.masks[idx]).convert("RGB")  # Remove alpha channel
         if self.transform:
             mask = self.transform(mask)
 
@@ -151,10 +111,10 @@ loader = DataLoader(dset, batch_size=1, shuffle=True)
 from tqdm import trange
 
 net = GenericColorPipeline(3).to(device)
-optimizer = torch.optim.Adam(net.parameters(), lr=1e-3)
+optimizer = torch.optim.Adam(net.parameters(), lr=1e-2)
 criterion = nn.MSELoss()
 
-for epoch in trange(10):
+for epoch in trange(1_000):
     for image, mask in loader:
         image, mask = image.to(device), mask.to(device)
         pred = net(image)
@@ -164,9 +124,15 @@ for epoch in trange(10):
         optimizer.step()
         print(f"Epoch {epoch}, Loss: {loss.item()}")
 
-new_data = transforms(Image.open("data/val-image-3.png")).unsqueeze(0).to(device)
+new_data = (
+    transforms(Image.open("data/val-image-3.png").convert("RGB"))
+    .unsqueeze(0)
+    .to(device)
+)
 pred = net(new_data)
-pred = pred.squeeze(0).squeeze(0).detach().cpu().numpy()
+pred = pred.squeeze(0).detach().cpu().numpy()
 print(pred.shape)
+print(new_data.shape)
 pred = (pred * 255).astype("uint8")  # ugh average imageio
+pred = pred.transpose(1, 2, 0)
 Image.fromarray(pred).save("prediction.png")
