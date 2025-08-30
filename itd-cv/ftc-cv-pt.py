@@ -27,9 +27,8 @@ class PixelWiseColorRegression(nn.Module):
 
     def forward(self, x):
         return F.sigmoid(torch.sum(x * self.p, dim=1, keepdim=True) + self.b)
-    
 
-    
+
 class GenericColorPipeline(nn.Module):
     def __init__(self, channels, *args, **kwargs):
         super().__init__(*args, **kwargs)
@@ -46,17 +45,41 @@ class GenericColorPipeline(nn.Module):
     # From https://stackoverflow.com/questions/56235733/is-there-a-tensor-operation-or-function-in-pytorch-that-works-like-cv2-dilate
     @staticmethod
     def dilation_pytorch(image, strel, origin=(0, 0), border_value=0):
-        image_pad = F.pad(image, [origin[0], strel.shape[0] - origin[0] - 1, origin[1], strel.shape[1] - origin[1] - 1], mode='constant', value=border_value)
-        image_unfold = F.unfold(image_pad.unsqueeze(0).unsqueeze(0), kernel_size=strel.shape)
+        image_pad = F.pad(
+            image,
+            [
+                origin[0],
+                strel.shape[0] - origin[0] - 1,
+                origin[1],
+                strel.shape[1] - origin[1] - 1,
+            ],
+            mode="constant",
+            value=border_value,
+        )
+        image_unfold = F.unfold(
+            image_pad.unsqueeze(0).unsqueeze(0), kernel_size=strel.shape
+        )
         strel_flatten = torch.flatten(strel).unsqueeze(0).unsqueeze(-1)
         sums = image_unfold + strel_flatten
         result, _ = sums.max(dim=1)
         return torch.reshape(result, image.shape)
-    
+
     @staticmethod
     def erosion_pytorch(image, strel, origin=(0, 0), border_value=0):
-        image_pad = F.pad(image, [origin[0], strel.shape[0] - origin[0] - 1, origin[1], strel.shape[1] - origin[1] - 1], mode='constant', value=border_value)
-        image_unfold = F.unfold(image_pad.unsqueeze(0).unsqueeze(0), kernel_size=strel.shape)
+        image_pad = F.pad(
+            image,
+            [
+                origin[0],
+                strel.shape[0] - origin[0] - 1,
+                origin[1],
+                strel.shape[1] - origin[1] - 1,
+            ],
+            mode="constant",
+            value=border_value,
+        )
+        image_unfold = F.unfold(
+            image_pad.unsqueeze(0).unsqueeze(0), kernel_size=strel.shape
+        )
         strel_flatten = torch.flatten(strel).unsqueeze(0).unsqueeze(-1)
         sums = image_unfold + strel_flatten
         result, _ = sums.min(dim=1)
@@ -65,25 +88,26 @@ class GenericColorPipeline(nn.Module):
     def forward(self, x):
         x = F.sigmoid(torch.sum(x * self.p, dim=1, keepdim=True) + self.b)
 
-
         x = x.repeat(1, 3, 1, 1)
-
-        
 
         return x
 
 
 import glob
+import os
 
 real_images = []
 mask_images = []
-for file in glob.glob("data/task-*.png"):
-    if "annotation" in file:
+for file in glob.glob("data/*.png"):
+    if "-" in file:
         continue
     else:
-        real_images.append(file)
-        n = int(file.split("-")[1].split(".png")[0])
-        mask_images.append(file.replace(".png", f"-annotation-{n}-by-1-tag-blue-0.png"))
+        if os.path.exists(file.replace(".png", "-blue.png")):
+            real_images.append(file)
+            mask_images.append(file.replace(".png", "-blue.png"))
+
+print(real_images)
+print(mask_images)
 
 from torchvision.transforms import v2
 
