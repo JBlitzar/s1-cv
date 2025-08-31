@@ -73,17 +73,21 @@ import os
 
 real_images = []
 mask_images = []
+mask_top_images = []
 for file in glob.glob("data/*.png"):
     if "-" in file:
         continue
     else:
         new = file.replace(".png", "-blue.png")
-        if os.path.exists(new):
+        new_top = file.replace(".png", "-blue-top.png")
+        if os.path.exists(new) and os.path.exists(new_top):
             real_images.append(file)
             mask_images.append(new)
+            mask_top_images.append(new_top)
 
 print(real_images)
 print(mask_images)
+print(mask_top_images)
 
 from torchvision.transforms import v2
 
@@ -121,7 +125,11 @@ class MyDataset(Dataset):
         if self.transform:
             mask = self.transform(mask)
 
-        return image, mask
+        top_mask = Image.open(mask_top_images[idx]).convert("RGB")
+        if self.transform:
+            top_mask = self.transform(top_mask)
+
+        return image, mask, top_mask
 
 
 dset = MyDataset(transforms, real_images, mask_images)
@@ -137,7 +145,7 @@ if os.path.exists("model.pt"):
     net.load_state_dict(torch.load("model.pt", map_location=device))
 else:
     for epoch in trange(1_000):
-        for image, mask in loader:
+        for image, mask, _ in loader:
             image, mask = image.to(device), mask.to(device)
             pred = net(image)
             loss = criterion(pred, mask)
@@ -181,11 +189,11 @@ best_score, best_params = -1, None
 with torch.no_grad():
     print("Running baseline (no morphology)...")
     baseline_score = 0
-    for image, mask in loader:
-        image, mask = image.to(device), mask.to(device)
+    for image, _, top_mask in loader:
+        image, top_mask = image.to(device), top_mask.to(device)
         pred = net(image)
         pred = (pred > 0.5).float()
-        loss = criterion(pred, mask)
+        loss = criterion(pred, top_mask)
         baseline_score += loss.item()
     baseline_score /= len(loader)
     print(f"Baseline score: {baseline_score:.4f}")
@@ -193,8 +201,8 @@ with torch.no_grad():
         for d in [1, 3, 5, 7, 9]:
             for i in [1, 2, 3, 4, 5]:
                 score_accum = 0
-                for image, mask in loader:
-                    image, mask = image.to(device), mask.to(device)
+                for image, _, top_mask in loader:
+                    image, top_mask = image.to(device), top_mask.to(device)
                     pred = net(image)
 
                     pred = (pred > 0.5).float()
@@ -212,7 +220,7 @@ with torch.no_grad():
                         .to(device)
                     )
 
-                    loss = criterion(morphed_tensor, mask)
+                    loss = criterion(morphed_tensor, top_mask)
                     score_accum += loss.item()
 
                 avg_score = score_accum / len(loader)
