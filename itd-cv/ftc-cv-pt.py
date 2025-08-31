@@ -185,49 +185,82 @@ def apply_morphology(mask, erode_size, dilate_size, iterations):
     return morphed
 
 
-best_score, best_params = -1, None
+def apply_morphology_batch(masks, erode_size, dilate_size, iterations):
+    """Apply morphology to a batch of masks"""
+    kernel_erode = cv2.getStructuringElement(cv2.MORPH_RECT, (erode_size, erode_size))
+    kernel_dilate = cv2.getStructuringElement(
+        cv2.MORPH_RECT, (dilate_size, dilate_size)
+    )
+
+    morphed_batch = []
+    for mask in masks:
+        morphed = cv2.erode(mask, kernel_erode, iterations=iterations)
+        morphed = cv2.dilate(morphed, kernel_dilate, iterations=iterations)
+        morphed_batch.append(morphed)
+    return morphed_batch
+
+
+# Pre-compute all predictions and targets
+print("Pre-computing predictions...")
+all_preds, all_targets = [], []
 with torch.no_grad():
-    print("Running baseline (no morphology)...")
-    baseline_score = 0
     for image, _, top_mask in loader:
         image, top_mask = image.to(device), top_mask.to(device)
         pred = net(image)
-        pred = (pred > 0.5).float()
-        loss = criterion(pred, top_mask)
-        baseline_score += loss.item()
-    baseline_score /= len(loader)
-    print(f"Baseline score: {baseline_score:.4f}")
-    for e in tqdm([1, 3, 5, 7, 9], leave=False):
-        for d in tqdm([1, 3, 5, 7, 9], leave=False):
-            for i in tqdm([1, 2, 3, 4, 5], leave=False):
-                for thresh in tqdm([0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8], leave=False):
-                    score_accum = 0
-                    for image, _, top_mask in loader:
-                        image, top_mask = image.to(device), top_mask.to(device)
-                        pred = net(image)
+        all_preds.append(pred.cpu())  # Keep as individual tensors
+        all_targets.append(top_mask.cpu())  # Keep as individual tensors
 
-                        pred = (pred > thresh).float()
+print(f"Pre-computed {len(all_preds)} predictions")
+print("Running grid search...")
+best_score, best_params = float("inf"), None
 
-                        pred_np = pred.squeeze(0).detach().cpu().numpy()
-                        pred_np = (pred_np * 255).astype("uint8")
-                        pred_np = pred_np.transpose(1, 2, 0)
+from itertools import product
 
-                        morphed = apply_morphology(pred_np, e, d, i)
+param_combinations = list(
+    product(
+        [1, 3, 5, 7, 9],  # erode sizes
+        [1, 3, 5, 7, 9],  # dilate sizes
+        [1, 2, 3, 4, 5],  # iterations
+        [0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8],  # thresholds
+    )
+)
 
-                        morphed_tensor = (
-                            torch.from_numpy(morphed.transpose(2, 0, 1) / 255.0)
-                            .unsqueeze(0)
-                            .float()
-                            .to(device)
-                        )
+for e, d, i, thresh in tqdm(param_combinations, desc="Grid search"):
+    score_accum = 0
 
-                        loss = criterion(morphed_tensor, top_mask)
-                        score_accum += loss.item()
+    for pred, target in zip(all_preds, all_targets):
+        # Move to device only when needed
+        pred = pred.to(device)
+        target = target.to(device)
 
-                    avg_score = score_accum / len(loader)
+        # Apply threshold
+        pred_thresh = (pred > thresh).float()
 
-                    if best_score == -1 or avg_score < best_score:
-                        best_score, best_params = avg_score, (e, d, i, thresh)
+        # Convert to numpy for morphology
+        pred_np = pred_thresh.squeeze(0).detach().cpu().numpy()
+        pred_np = (pred_np * 255).astype("uint8").transpose(1, 2, 0)
+
+        # Apply morphology
+        morphed = apply_morphology(pred_np, e, d, i)
+
+        # Convert back to tensor
+        morphed_tensor = (
+            torch.from_numpy(morphed.transpose(2, 0, 1) / 255.0)
+            .unsqueeze(0)
+            .float()
+            .to(device)
+        )
+
+        # Compute loss
+        loss = criterion(morphed_tensor, target)
+        score_accum += loss.item()
+
+    avg_score = score_accum / len(all_preds)
+
+    if avg_score < best_score:
+        best_score, best_params = avg_score, (e, d, i, thresh)
+        tqdm.write(f"New best: {best_params} -> {best_score:.4f}")
+
 
 print(f"Best: {best_params} -> {best_score:.4f}")
 
@@ -246,7 +279,7 @@ pred_np = pred_np.transpose(1, 2, 0)
 
 
 if best_params:
-    e, d, i = best_params
+    e, d, i, t = best_params
     pred_v2 = apply_morphology(pred_np, e, d, i)
 else:
     pred_v2 = pred_np
