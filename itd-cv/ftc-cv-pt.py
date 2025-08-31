@@ -67,9 +67,10 @@ for file in glob.glob("data/*.png"):
     if "-" in file:
         continue
     else:
-        if os.path.exists(file.replace(".png", "-blue.png")):
+        new = file.replace(".png", "-blue-top.png")
+        if os.path.exists(new):
             real_images.append(file)
-            mask_images.append(file.replace(".png", "-blue.png"))
+            mask_images.append(new)
 
 print(real_images)
 print(mask_images)
@@ -120,7 +121,7 @@ import cv2
 import numpy as np
 
 net = GenericColorPipeline(3).to(device)
-optimizer = torch.optim.Adam(net.parameters(), lr=1e-2)
+optimizer = torch.optim.Adam(net.parameters(), lr=3e-3)
 criterion = nn.MSELoss()
 if os.path.exists("model.pt"):
     net.load_state_dict(torch.load("model.pt", map_location=device))
