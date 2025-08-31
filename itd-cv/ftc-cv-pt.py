@@ -38,16 +38,20 @@ class GenericColorPipeline(nn.Module):
         super().__init__(*args, **kwargs)
         self.channels = channels
 
-        # r*rp + g * gp + b * bp + bias added together
+        # rw*MSE(r,rp) + gw*MSE(g,gp) + bw*MSE(b,bp) + bias added together
         # weight of size channels * thing + bias
         self.p = nn.Parameter(torch.randn(channels, 1, 1))
+
+        self.w = nn.Parameter(torch.randn(channels, 1, 1))
 
         self.b = nn.Parameter(torch.randn(1, 1))
 
     def forward(self, x):
-        x = x * self.p
+        x = x / (x.sum(dim=1, keepdim=True) + 1e-6)
 
-        x = F.sigmoid(torch.sum(x, dim=1, keepdim=True) + self.b)
+        x = torch.sum(self.w * (x - self.p) ** 2, dim=1, keepdim=True)
+
+        x = F.sigmoid(x + self.b)
 
         x = x.repeat(1, 3, 1, 1)
 
@@ -74,8 +78,10 @@ from torchvision.transforms import v2
 
 transforms = v2.Compose(
     [
+        # v2.Lambda(lambda img: img.convert("HSV")),
         v2.ToImage(),
         v2.ToDtype(torch.float32, scale=True),
+        # v2.ColorJitter(brightness=0.2),
         # v2.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225]),
     ]
 )
