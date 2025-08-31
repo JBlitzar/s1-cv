@@ -187,9 +187,11 @@ def apply_morphology(mask, erode_size, dilate_size, iterations):
 
 def apply_morphology_batch(masks, erode_size, dilate_size, iterations):
     """Apply morphology to a batch of masks"""
-    kernel_erode = cv2.getStructuringElement(cv2.MORPH_RECT, (erode_size, erode_size))
+    kernel_erode = cv2.getStructuringElement(
+        cv2.MORPH_ELLIPSE, (erode_size, erode_size)
+    )
     kernel_dilate = cv2.getStructuringElement(
-        cv2.MORPH_RECT, (dilate_size, dilate_size)
+        cv2.MORPH_ELLIPSE, (dilate_size, dilate_size)
     )
 
     morphed_batch = []
@@ -271,18 +273,16 @@ new_data = (
     .to(device)
 )
 pred = net(new_data)
-pred = (pred > 0.5).float()
+e, d, i, t = best_params
+pred = (pred > t).float()
 
 pred_np = pred.squeeze(0).detach().cpu().numpy()
 pred_np = (pred_np * 255).astype("uint8")
 pred_np = pred_np.transpose(1, 2, 0)
 
 
-if best_params:
-    e, d, i, t = best_params
-    pred_v2 = apply_morphology(pred_np, e, d, i)
-else:
-    pred_v2 = pred_np
+pred_v2 = apply_morphology(pred_np, e, d, i)
+
 
 Image.fromarray(pred_v2).save("prediction_v2.png")
 
