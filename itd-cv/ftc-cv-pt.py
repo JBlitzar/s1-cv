@@ -33,6 +33,16 @@ class PixelWiseColorRegression(nn.Module):
         return F.sigmoid(torch.sum(x * self.p, dim=1, keepdim=True) + self.b)
 
 
+class MaxwellTriangle(nn.Module):
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+
+    def forward(self, x):
+        x = x / (x.sum(dim=1, keepdim=True) + 1e-6)
+
+        return x
+
+
 class GenericColorPipeline(nn.Module):
     def __init__(self, channels, *args, **kwargs):
         super().__init__(*args, **kwargs)
@@ -67,7 +77,7 @@ for file in glob.glob("data/*.png"):
     if "-" in file:
         continue
     else:
-        new = file.replace(".png", "-blue-top.png")
+        new = file.replace(".png", "-blue.png")
         if os.path.exists(new):
             real_images.append(file)
             mask_images.append(new)
@@ -233,3 +243,9 @@ else:
     pred_v2 = pred_np
 
 Image.fromarray(pred_v2).save("prediction_v2.png")
+
+Image.fromarray(
+    (
+        MaxwellTriangle()(new_data).squeeze(0).permute(1, 2, 0).cpu().numpy() * 255
+    ).astype("uint8")
+).save("maxwell.png")
