@@ -197,36 +197,37 @@ with torch.no_grad():
         baseline_score += loss.item()
     baseline_score /= len(loader)
     print(f"Baseline score: {baseline_score:.4f}")
-    for e in [1, 3, 5, 7, 9]:
-        for d in [1, 3, 5, 7, 9]:
-            for i in [1, 2, 3, 4, 5]:
-                score_accum = 0
-                for image, _, top_mask in loader:
-                    image, top_mask = image.to(device), top_mask.to(device)
-                    pred = net(image)
+    for e in tqdm([1, 3, 5, 7, 9], leave=False):
+        for d in tqdm([1, 3, 5, 7, 9], leave=False):
+            for i in tqdm([1, 2, 3, 4, 5], leave=False):
+                for thresh in tqdm([0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8], leave=False):
+                    score_accum = 0
+                    for image, _, top_mask in loader:
+                        image, top_mask = image.to(device), top_mask.to(device)
+                        pred = net(image)
 
-                    pred = (pred > 0.5).float()
+                        pred = (pred > thresh).float()
 
-                    pred_np = pred.squeeze(0).detach().cpu().numpy()
-                    pred_np = (pred_np * 255).astype("uint8")
-                    pred_np = pred_np.transpose(1, 2, 0)
+                        pred_np = pred.squeeze(0).detach().cpu().numpy()
+                        pred_np = (pred_np * 255).astype("uint8")
+                        pred_np = pred_np.transpose(1, 2, 0)
 
-                    morphed = apply_morphology(pred_np, e, d, i)
+                        morphed = apply_morphology(pred_np, e, d, i)
 
-                    morphed_tensor = (
-                        torch.from_numpy(morphed.transpose(2, 0, 1) / 255.0)
-                        .unsqueeze(0)
-                        .float()
-                        .to(device)
-                    )
+                        morphed_tensor = (
+                            torch.from_numpy(morphed.transpose(2, 0, 1) / 255.0)
+                            .unsqueeze(0)
+                            .float()
+                            .to(device)
+                        )
 
-                    loss = criterion(morphed_tensor, top_mask)
-                    score_accum += loss.item()
+                        loss = criterion(morphed_tensor, top_mask)
+                        score_accum += loss.item()
 
-                avg_score = score_accum / len(loader)
+                    avg_score = score_accum / len(loader)
 
-                if best_score == -1 or avg_score < best_score:
-                    best_score, best_params = avg_score, (e, d, i)
+                    if best_score == -1 or avg_score < best_score:
+                        best_score, best_params = avg_score, (e, d, i, thresh)
 
 print(f"Best: {best_params} -> {best_score:.4f}")
 
