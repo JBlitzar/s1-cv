@@ -49,7 +49,7 @@ class GenericColorPipeline(nn.Module):
         self.channels = channels
 
         # rw*MSE(r,rp) + gw*MSE(g,gp) + bw*MSE(b,bp) + bias added together
-        # weight of size channels * thing + bias
+
         self.p = nn.Parameter(torch.randn(channels, 1, 1))
 
         self.w = nn.Parameter(torch.randn(channels, 1, 1))
