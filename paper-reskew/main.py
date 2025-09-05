@@ -11,6 +11,7 @@
 import cv2
 import numpy as np
 from PIL import Image
+import itertools
 
 
 def save(img, name="out.png"):
@@ -30,10 +31,24 @@ gray = (gray > 160) * 255
 
 gray = gray.astype(np.uint8)
 
+save(gray, "gray-init.png")
+
 kernel = np.ones((5, 5), np.uint8)
 gray = cv2.dilate(gray, kernel, iterations=5)
 gray = cv2.erode(gray, kernel, iterations=5)
 
+save(gray, "gray.png")
+
+
+# from https://stackoverflow.com/questions/9043805/test-if-two-lines-intersect-javascript-function
+def intersects(a, b, c, d, p, q, r, s):
+    det = (c - a) * (s - q) - (r - p) * (d - b)
+    if det == 0:
+        return False
+    else:
+        lambda_ = ((s - q) * (r - a) + (p - r) * (s - b)) / det
+        gamma = ((b - d) * (r - a) + (c - a) * (s - b)) / det
+        return (0 < lambda_ < 1) and (0 < gamma < 1)
 
 contours, _ = cv2.findContours(gray, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
 if contours:
@@ -51,40 +66,37 @@ if contours:
         cv2.circle(mask, tuple(c), 50, 120, -1)
 
     gray = mask
-    if len(corners) == 4:
 
-        def order_points(pts):
-            rect = np.zeros((4, 2), dtype="float32")
-            s = pts.sum(axis=1)
-            rect[0] = pts[np.argmin(s)]
-            rect[2] = pts[np.argmax(s)]
-            diff = np.diff(pts, axis=1)
-            rect[1] = pts[np.argmin(diff)]
-            rect[3] = pts[np.argmax(diff)]
-            return rect
+    assert len(corners) == 4
 
-        rect = order_points(corners)
-        (tl, tr, br, bl) = rect
+    for ordering in itertools.permutations(corners):
+        # if AB intersects CD
+        o = ordering
+        a=o[0]
+        b=o[1]
+        c=o[2]
+        d=o[3]
+        if intersects(a[0],a[1],b[0],b[1],c[0],c[1],d[0],d[1]):
+            # probably good! corners intersect.
+            corners = [a,c,b,d]
+            break
 
-        widthA = np.linalg.norm(br - bl)
-        widthB = np.linalg.norm(tr - tl)
-        maxWidth = int(max(widthA, widthB))
 
-        heightA = np.linalg.norm(tr - br)
-        heightB = np.linalg.norm(tl - bl)
-        maxHeight = int(max(heightA, heightB))
+    size = (int(8.5*1000), int(11*1000))
+    pts2 = np.float32([
+        [0,0],
+        [size[0],0],
+        [size[0],size[1]],
+        [0,size[1]]])
+    # https://math.stackexchange.com/questions/2789094/deskew-and-rotate-a-photographed-rectangular-image-aka-perspective-correction
+    M, mask = cv2.findHomography(np.float32(corners),pts2)
+    
+    
 
-        dst = np.array([
-            [0, 0],
-            [maxWidth - 1, 0],
-            [maxWidth - 1, maxHeight - 1],
-            [0, maxHeight - 1]
-        ], dtype="float32")
+    dst = cv2.warpPerspective(img, M, size)
 
-        M = cv2.getPerspectiveTransform(rect, dst)
-        unskewed = cv2.warpPerspective(img, M, (maxWidth, maxHeight))
-        save(unskewed, "unskewed.png")
+    save(dst, "unskewed.png")
+    
 
-save(gray, "gray.png")
 
 
