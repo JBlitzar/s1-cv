@@ -38,23 +38,20 @@ class PixelGrid:
         self.img = img
         self.height, self.width = energies.shape
 
-        # Initialize cumulative energy array and parent tracking
-        self.cumulative = np.full((self.height, self.width), np.inf)
+        self.cumulative = np.full((self.height, self.width), np.inf) # cumulative energies
         self.parents = np.full((self.height, self.width), -1, dtype=np.int32)
         self.seam = None
 
+    
+
     def populate(self):
-        # Initialize first row
         self.cumulative[0, :] = self.energies[0, :]
 
-        # Process each row
         for y in range(1, self.height):
             for x in range(self.width):
-                # Find minimum cumulative energy from possible parents
                 min_energy = np.inf
                 best_parent = -1
 
-                # Check three possible parent positions
                 for dx in [-1, 0, 1]:
                     parent_x = x + dx
                     if 0 <= parent_x < self.width:
@@ -66,11 +63,9 @@ class PixelGrid:
                 self.cumulative[y, x] = min_energy + self.energies[y, x]
                 self.parents[y, x] = best_parent
 
-        # Find the seam by backtracking from minimum in last row
         last_row = self.cumulative[-1, :]
         min_x = np.argmin(last_row)
 
-        # Backtrack to find the seam
         seam = []
         current_x = min_x
         for y in range(self.height - 1, -1, -1):
@@ -78,7 +73,7 @@ class PixelGrid:
             if y > 0:
                 current_x = self.parents[y, current_x]
 
-        self.seam = seam[::-1]  # Reverse to get top-to-bottom order
+        self.seam = seam[::-1]
 
     def visualize(self):
         img2 = self.img.copy()
@@ -87,16 +82,13 @@ class PixelGrid:
         save(img2)
 
     def remove_seam(self):
-        # Create new image without the seam
         new_img = np.zeros(
             (self.height, self.width - 1, self.img.shape[2]), dtype=self.img.dtype
         )
 
         for y in range(self.height):
             seam_x = self.seam[y][0]
-            # Copy pixels before seam
             new_img[y, :seam_x] = self.img[y, :seam_x]
-            # Copy pixels after seam
             new_img[y, seam_x:] = self.img[y, seam_x + 1 :]
 
         save(new_img)
