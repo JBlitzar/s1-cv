@@ -29,6 +29,7 @@ if img.shape[2] == 4:
 
 # Claude Sonnet 4 via github copilot used to refactor `oop.py` into the file seen here (faster I guess, less oop.)
 # prompt used: eliminate the pixel class and instead operate on rows of pixels at a time. So store energies in a numpy array, cumulative energies in a numpy array, and parents in a numpy array
+# After looking at the implementation, I re-coded populate() myself
 class PixelGrid:
     def __init__(self, img, energies=None):
         if energies is None:
@@ -47,23 +48,34 @@ class PixelGrid:
     def populate(self):
         self.cumulative[0, :] = self.energies[0, :]
 
-        for y in range(1, self.height):
+
+        for row in range(len(self.height)):
+            #print(row)
+            # if row != 0:
+            #     for pixel in self.pixels[row]:
+            #         pixel.post_reception()
+            # for pixel in self.pixels[row]:
+            #     pixel.advertise_around()
             for x in range(self.width):
                 min_energy = np.inf
                 best_parent = -1
 
-                for dx in [-1, 0, 1]:
-                    parent_x = x + dx
-                    if 0 <= parent_x < self.width:
-                        parent_energy = self.cumulative[y - 1, parent_x]
-                        if parent_energy < min_energy:
-                            min_energy = parent_energy
-                            best_parent = parent_x
+                for offset in [-1,0,1]:
+                    # scan parent positions
+                    potential_y = row - 1
+                    potential_x = x + offset
+                    try:
+                        energy = self.energies[potential_y][potential_x]
+                        if energy < min_energy:
+                            best_parent = offset
+                            min_energy = energy
+                    except IndexError:
+                        pass
+                
+                self.cumulative[row][x] = min_energy + self.energies[row][x]
+                self.parents[row][x] = best_parent
 
-                self.cumulative[y, x] = min_energy + self.energies[y, x]
-                self.parents[y, x] = best_parent
-
-        last_row = self.cumulative[-1, :]
+        last_row = self.cumulative[-1]
         min_x = np.argmin(last_row)
 
         seam = []
@@ -77,22 +89,25 @@ class PixelGrid:
 
     def visualize(self):
         img2 = self.img.copy()
-        for x, y in self.seam:
-            img2[y, x] = [255, 0, 255]
+        for pixel in self.seam:
+            img2[pixel.y, pixel.x] = [255,0,255]
+        
         save(img2)
 
     def remove_seam(self):
-        new_img = np.zeros(
-            (self.height, self.width - 1, self.img.shape[2]), dtype=self.img.dtype
-        )
+        img2 = self.img.copy().tolist()
+        seam_rev = self.seam[::-1]
 
-        for y in range(self.height):
-            seam_x = self.seam[y][0]
-            new_img[y, :seam_x] = self.img[y, :seam_x]
-            new_img[y, seam_x:] = self.img[y, seam_x + 1 :]
+        new_rows = []
 
-        save(new_img)
-        return new_img
+        for row_idx in range(len(img2)):
+            row = deepcopy(img2[row_idx])
+            p = seam_rev[row_idx]
+            del row[p.x]
+
+            new_rows.append(row)
+        save(np.array(new_rows, dtype="uint8"))
+        return new_rows
 
 
 grid = PixelGrid(img)
