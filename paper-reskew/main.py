@@ -50,6 +50,12 @@ def intersects(a, b, c, d, p, q, r, s):
         gamma = ((b - d) * (r - a) + (c - a) * (s - b)) / det
         return (0 < lambda_ < 1) and (0 < gamma < 1)
 
+#lenght of line, implemented by me
+def length(a,b,c,d):
+    dy = d - b
+    dx = c - a
+    return np.sqrt(dy ** 2 + dx ** 2)
+
 contours, _ = cv2.findContours(gray, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
 if contours:
     cnt = max(contours, key=cv2.contourArea)
@@ -76,7 +82,7 @@ if contours:
         b=o[1]
         c=o[2]
         d=o[3]
-        if intersects(a[0],a[1],b[0],b[1],c[0],c[1],d[0],d[1]):
+        if intersects(a[0],a[1],b[0],b[1],c[0],c[1],d[0],d[1]) and length(a[0],a[1],c[0],c[1]) < length(b[0],b[1],c[0],c[1]):
             # probably good! corners intersect.
             corners = [a,c,b,d]
             break
