@@ -19,7 +19,7 @@ def save(img, name="out.png"):
     im.save(name)
 
 
-img = np.array(Image.open("2.jpg"))
+img = np.array(Image.open("3.jpg"))
 print(img.shape)
 
 gray = cv2.cvtColor(img, cv2.COLOR_RGB2GRAY)
