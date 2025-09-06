@@ -50,11 +50,13 @@ def intersects(a, b, c, d, p, q, r, s):
         gamma = ((b - d) * (r - a) + (c - a) * (s - b)) / det
         return (0 < lambda_ < 1) and (0 < gamma < 1)
 
-#lenght of line, implemented by me
-def length(a,b,c,d):
+
+# lenght of line, implemented by me
+def length(a, b, c, d):
     dy = d - b
     dx = c - a
-    return np.sqrt(dy ** 2 + dx ** 2)
+    return np.sqrt(dy**2 + dx**2)
+
 
 contours, _ = cv2.findContours(gray, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
 if contours:
@@ -63,8 +65,6 @@ if contours:
     epsilon = 0.02 * cv2.arcLength(cnt, True)
     approx = cv2.approxPolyDP(cnt, epsilon, True)
     corners = approx.reshape(-1, 2)
-
-
 
     mask = np.zeros_like(gray)
     cv2.drawContours(mask, [cnt], -1, 255, -1)
@@ -78,31 +78,22 @@ if contours:
     for ordering in itertools.permutations(corners):
         # if AB intersects CD
         o = ordering
-        a=o[0]
-        b=o[1]
-        c=o[2]
-        d=o[3]
-        if intersects(a[0],a[1],b[0],b[1],c[0],c[1],d[0],d[1]) and length(a[0],a[1],c[0],c[1]) < length(b[0],b[1],c[0],c[1]):
+        a = o[0]
+        b = o[1]
+        c = o[2]
+        d = o[3]
+        if intersects(a[0], a[1], b[0], b[1], c[0], c[1], d[0], d[1]) and length(
+            a[0], a[1], c[0], c[1]
+        ) < length(b[0], b[1], c[0], c[1]):
             # probably good! corners intersect.
-            corners = [a,c,b,d]
+            corners = [a, c, b, d]
             break
 
-
-    size = (int(8.5*1000), int(11*1000))
-    pts2 = np.float32([
-        [0,0],
-        [size[0],0],
-        [size[0],size[1]],
-        [0,size[1]]])
+    size = (int(8.5 * 100), int(11 * 100))
+    pts2 = np.float32([[0, 0], [size[0], 0], [size[0], size[1]], [0, size[1]]])
     # https://math.stackexchange.com/questions/2789094/deskew-and-rotate-a-photographed-rectangular-image-aka-perspective-correction
-    M, mask = cv2.findHomography(np.float32(corners),pts2)
-    
-    
+    M, mask = cv2.findHomography(np.float32(corners), pts2)
 
     dst = cv2.warpPerspective(img, M, size)
 
     save(dst, "unskewed.png")
-    
-
-
-
