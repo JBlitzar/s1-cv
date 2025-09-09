@@ -65,22 +65,24 @@ for y, row in enumerate(image):
         elif 22.5 < angle < 67.5:
             dy = -1
             dx = 1
-
-        
-
-
-        if (0 <= angle < 22.5) or (157.5 <= angle < 180):
-            before = image[y, x-1] if x-1 >= 0 else 0
-            after = image[y, x+1] if x+1 < image.shape[1] else 0
-        elif (22.5 <= angle < 67.5):
-            before = image[y-1, x+1] if y-1 >= 0 and x+1 < image.shape[1] else 0
-            after = image[y+1, x-1] if y+1 < image.shape[0] and x-1 >= 0 else 0
-        elif (67.5 <= angle < 112.5):
-            before = image[y-1, x] if y-1 >= 0 else 0
-            after = image[y+1, x] if y+1 < image.shape[0] else 0
+        elif 67.5 < angle < 112.5:
+            dy = -1
+            dx = 0
         else:
-            before = image[y-1, x-1] if y-1 >= 0 and x-1 >= 0 else 0
-            after = image[y+1, x+1] if y+1 < image.shape[0] and x+1 < image.shape[1] else 0
+            dy = -1
+            dx = -1
+        
+        before = 0
+        try:
+            before = image[y + dy][x + dx]
+        except IndexError:
+            pass
+
+        after = 0
+        try:
+            after = image[y - dy][x - dx]
+        except IndexError:
+            pass
 
         if edge_strength < before or edge_strength < after:
             image[y, x] = 0
