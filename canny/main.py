@@ -87,6 +87,42 @@ for y, row in enumerate(image):
         if edge_strength < before or edge_strength < after:
             image[y, x] = 0
 
+HIGH_THRESH = 200
+LOW_THRESH = 20
+for y, row in enumerate(image):
+    for x, pixel in enumerate(row):
+        if pixel > HIGH_THRESH:
+            image[y][x] = 1
+        elif pixel > LOW_THRESH:
+            image[y][x] = 0.5
+        else:
+            image[y][x] = 0
+
+flag = True
+while flag: 
+    flag = False
+    for y, row in enumerate(image):
+        for x, pixel in enumerate(row):
+            if pixel == 0.5:
+                def has_neighborhood():
+                    dys = [-1,0,1]
+                    dxs = [-1,0,1]
+                    for dy in dys:
+                        for dx in dxs:
+                            try:
+                                if image[y+dy][x+dx] == 1:
+                                    return True
+                            except IndexError:
+                                pass
+                    return False
+                if has_neighborhood():
+                    image[y][x] = 1
+                    flag = True
 
 
-save(image)
+for y, row in enumerate(image):
+    for x, pixel in enumerate(row):
+        if pixel == 0.5:
+            image[y][x] = 0
+
+save(image * 255)
