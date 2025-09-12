@@ -9,11 +9,14 @@
 from PIL import Image
 import numpy as np
 
-def save(img):
-    im = Image.fromarray(img.astype(np.uint8))  # (img * 255).astype(np.uint8)
-    im.save("out.png")
+def save(img, file="out.png"):
+    if(np.max(img) < 255):
+        img = (img * 255).astype(np.uint8)
 
-image = np.array(Image.open("camera.png").convert("L"))
+    im = Image.fromarray(img.astype(np.uint8))  # (img * 255).astype(np.uint8)
+    im.save(file)
+
+image = np.array(Image.open("lizard.png").convert("L"))
 
 
 # 1. Apply gaussian filter to smooth the image
@@ -47,10 +50,11 @@ sobel_y = np.array([[-1, -2, -1],
 grad_x = convolution2d(image, sobel_x)
 grad_y = convolution2d(image, sobel_y)
 image = np.sqrt(grad_x**2 + grad_y**2)
+save(image, "sobel.png")
 
 theta = np.atan2(grad_y, grad_x)
 
-
+out = image.copy()
 for y, row in enumerate(image):
     for x, pixel in enumerate(row):
         edge_strength = pixel
@@ -59,13 +63,13 @@ for y, row in enumerate(image):
         dy = 0
         dx = 0
 
-        if angle < 22.5 or angle > 157.5:
+        if angle < 22.5 or angle >= 157.5:
             dy = 0
             dx = 1
-        elif 22.5 < angle < 67.5:
+        elif angle < 67.5:
             dy = -1
             dx = 1
-        elif 67.5 < angle < 112.5:
+        elif angle < 112.5:
             dy = -1
             dx = 0
         else:
@@ -85,7 +89,9 @@ for y, row in enumerate(image):
             pass
 
         if edge_strength < before or edge_strength < after:
-            image[y, x] = 0
+            out[y, x] = 0
+image = out
+save(image, "gmt.png")
 
 HIGH_THRESH = 200
 LOW_THRESH = 20
