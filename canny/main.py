@@ -16,7 +16,7 @@ def save(img, file="out.png"):
     im = Image.fromarray(img.astype(np.uint8))  # (img * 255).astype(np.uint8)
     im.save(file)
 
-image = np.array(Image.open("lizard.png").convert("L"))
+image = np.array(Image.open("camera.png").convert("L"))
 
 
 # 1. Apply gaussian filter to smooth the image
@@ -93,8 +93,8 @@ for y, row in enumerate(image):
 image = out
 save(image, "gmt.png")
 
-HIGH_THRESH = 200
-LOW_THRESH = 20
+HIGH_THRESH = np.mean(image) * 0.9 + np.max(image) * 0.2
+LOW_THRESH = HIGH_THRESH / 2
 for y, row in enumerate(image):
     for x, pixel in enumerate(row):
         if pixel > HIGH_THRESH:
