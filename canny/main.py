@@ -16,7 +16,7 @@ def save(img, file="out.png"):
     im = Image.fromarray(img.astype(np.uint8))  # (img * 255).astype(np.uint8)
     im.save(file)
 
-image = np.array(Image.open("camera.png").convert("L"))
+image = np.array(Image.open("lizard.png").convert("L"))
 
 
 # 1. Apply gaussian filter to smooth the image
