@@ -39,6 +39,7 @@ gaussian_filter = np.array([[2, 4, 5, 4, 2],[4, 9, 12, 9, 4], [5, 12, 15, 12, 5]
 image = (1/159) * convolution2d(image, gaussian_filter)
 
 
+# magic arrays that get the gradient
 sobel_x = np.array([[-1, 0, 1],
                     [-2, 0, 2],
                     [-1, 0, 1]])
