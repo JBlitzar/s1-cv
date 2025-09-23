@@ -125,7 +125,6 @@ for x in x_bins:
             if (vote[0]-x)**2 + (vote[1]-y)**2 < (step_size/2)**2:
                 new_vote_vote_counts[-1] += 1
 
-print("binned votes")
 newer_votes = [] 
 for vote in new_votes:
     real_votes_this_vote = []
@@ -146,11 +145,14 @@ new_votes = np.array(new_votes)
 print(new_vote_vote_counts)
 order = np.argsort(new_vote_vote_counts)
 print(order)
-order = order.tolist()[::-1][:10]
+order = order.tolist()[::-1][:30]
 print("asdf")
 print(order)
 for o in order:
     print(new_votes[o], new_vote_vote_counts[o])
+
+
+# Begin ai-generated display code
 # Expand canvas to fit vanishing points
 vanishing_points = [new_votes[o] for o in order]
 vanishing_points = np.array(vanishing_points)
@@ -179,3 +181,23 @@ for pt in vanishing_points:
     cv2.putText(canvas, f"({int(pt[0])}, {int(pt[1])})", (x, y+30), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (255, 0, 255), 1)
 
 save(canvas, "vanishing_points.png")
+
+# end ai-generated display code
+
+
+image_center = np.array([hough_vis.shape[1]/2, hough_vis.shape[0]/2])
+def get_angle(point):
+    direction = point - image_center
+    return np.atan2(direction[1], direction[0])
+
+top_point = vanishing_points[0]
+direction = get_angle(top_point)
+print("direction", direction / np.pi * 180)
+
+for vp in vanishing_points:
+    angle = get_angle(vp)
+    if abs(angle - direction) > np.pi / 2:
+        vp2 = vp
+        break
+print("vp2 angle", get_angle(vp2) / np.pi * 180)
+
