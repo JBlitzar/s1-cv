@@ -105,29 +105,77 @@ for line1 in lines:
 
 votes = np.array(votes)
 print(votes)
-vote_votes_es = []
-for x, y in votes:
-    vote_votes = 0
-    for vx,vy in votes:
-        if (vx-x)**2 + (vy-y)**2 < 5**2:
-            vote_votes += 1
-    vote_votes_es.append(vote_votes)
 
-vote_votes_es = np.array(vote_votes_es)
+min_x = np.min(votes[:,0])
+max_x = np.max(votes[:,0])
+min_y = np.min(votes[:,1])
+max_y = np.max(votes[:,1])
+print(min_x, max_x, min_y, max_y)
+step_size = 10
+x_bins = np.arange(min_x, max_x, step_size)
+y_bins = np.arange(min_y, max_y, step_size)
+
 new_votes = []
 new_vote_vote_counts = []
-for idx, vote in enumerate(votes):
-    flag = False
-    for new_vote in new_votes:
-        if (new_vote[0]-vote[0])**2 + (new_vote[1]-vote[1])**2 < 5**2:
-            flag = True
-    if not flag:
-        new_votes.append(vote)
-        new_vote_vote_counts.append(vote_votes_es[idx])
-print(new_votes, new_vote_vote_counts)
-order = np.argsort(-1 * new_vote_vote_counts)
-order = order.tolist()
-votes_sorted = new_votes[order]
-vote_counts_sorted = new_vote_vote_counts[order]
+for x in x_bins:
+    for y in y_bins:
+        new_vote_vote_counts.append(0)
+        new_votes.append((x,y))
+        for vote in votes:
+            if (vote[0]-x)**2 + (vote[1]-y)**2 < (step_size/2)**2:
+                new_vote_vote_counts[-1] += 1
 
-print(votes_sorted[:3])
+print("binned votes")
+newer_votes = [] 
+for vote in new_votes:
+    real_votes_this_vote = []
+    for real_vote in votes:
+        if (vote[0] - real_vote[0])**2 + (vote[1] - real_vote[1])**2 < (step_size/2)**2:
+            real_votes_this_vote.append(real_vote)
+
+    if len(real_votes_this_vote) > 0:
+        newer_votes.append(np.mean(real_votes_this_vote, axis=0))
+    else:
+        newer_votes.append(vote)
+
+new_votes = newer_votes
+
+print("got new votes")
+#print(new_votes, new_vote_vote_counts)
+new_votes = np.array(new_votes)
+print(new_vote_vote_counts)
+order = np.argsort(new_vote_vote_counts)
+print(order)
+order = order.tolist()[::-1][:10]
+print("asdf")
+print(order)
+for o in order:
+    print(new_votes[o], new_vote_vote_counts[o])
+# Expand canvas to fit vanishing points
+vanishing_points = [new_votes[o] for o in order]
+vanishing_points = np.array(vanishing_points)
+
+# Find min/max coordinates to determine needed canvas size
+all_points = np.vstack([[[0, 0], [hough_vis.shape[1], hough_vis.shape[0]]], vanishing_points])
+min_x = int(np.floor(np.min(all_points[:, 0])))
+max_x = int(np.ceil(np.max(all_points[:, 0])))
+min_y = int(np.floor(np.min(all_points[:, 1])))
+max_y = int(np.ceil(np.max(all_points[:, 1])))
+
+# Compute offsets if vanishing points are outside the image
+offset_x = -min(0, min_x)
+offset_y = -min(0, min_y)
+new_w = max(max_x + offset_x, hough_vis.shape[1] + offset_x)
+new_h = max(max_y + offset_y, hough_vis.shape[0] + offset_y)
+
+# Ensure new_h and new_w are at least as large as the original image plus offsets
+canvas = np.zeros((new_h, new_w, 3), dtype=np.uint8)
+canvas[offset_y:offset_y + hough_vis.shape[0], offset_x:offset_x + hough_vis.shape[1]] = hough_vis
+
+# Draw vanishing points
+for pt in vanishing_points:
+    x, y = int(pt[0] + offset_x), int(pt[1] + offset_y)
+    cv2.circle(canvas, (x, y), 10, (0, 0, 255), -1)
+    cv2.putText(canvas, f"({int(pt[0])}, {int(pt[1])})", (x, y+30), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (255, 0, 255), 1)
+
+save(canvas, "vanishing_points.png")
