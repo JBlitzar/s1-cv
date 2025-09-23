@@ -4,7 +4,6 @@ import os
 import cv2
 from copy import deepcopy
 from tqdm import trange
-from sklearn.cluster import KMeans
 from tqdm import tqdm
 
 def save(img, file="out.png"):
@@ -117,8 +116,8 @@ y_bins = np.arange(min_y, max_y, step_size)
 
 new_votes = []
 new_vote_vote_counts = []
-for x in x_bins:
-    for y in y_bins:
+for x in tqdm(x_bins, leave=False):
+    for y in tqdm(y_bins, leave=False):
         new_vote_vote_counts.append(0)
         new_votes.append((x,y))
         for vote in votes:
@@ -190,14 +189,61 @@ def get_angle(point):
     direction = point - image_center
     return np.atan2(direction[1], direction[0])
 
+def abs_angle_diff(a1, a2):
+    a1 = a1 % (2 * np.pi)
+    a2 = a2 % (2 * np.pi)
+    diff = abs(a1 - a2)
+    if diff > np.pi:
+        diff = 2 * np.pi - diff
+    return diff
 top_point = vanishing_points[0]
 direction = get_angle(top_point)
 print("direction", direction / np.pi * 180)
 
 for vp in vanishing_points:
     angle = get_angle(vp)
-    if abs(angle - direction) > np.pi / 2:
+    if abs_angle_diff(angle, direction) > np.pi / 2:
         vp2 = vp
         break
 print("vp2 angle", get_angle(vp2) / np.pi * 180)
 
+candidates = []
+# Assuming pinhole camera and symmetric vanishing points, third will lie on the perpendicular bisector of the line segment between the first two
+# 0=-\frac{\left(x_{2}-x_{1}\right)}{y_{2}-y_{1}}\left(x-\frac{\left(x_{1}+x_{2}\right)}{2}\right)+\frac{y_{1}+y_{2}}{2}-y
+
+def bisector_score(x1,y1,x2,y2,x,y):
+    mx = (x1 + x2) / 2
+    my = (y1 + y2) / 2
+    if y2 == y1:
+        return abs(x - mx)
+    
+    score = -(x2 - x1) / (y2 - y1) * (x - mx) + my - y
+    return score ** 2
+
+candidates
+for vp in vanishing_points:
+    angle = get_angle(vp)
+
+    score = bisector_score(top_point[0], top_point[1], vp2[0], vp2[1], vp[0], vp[1])
+    is_on_screen = 0 <= vp[0] < hough_vis.shape[1] and 0 <= vp[1] < hough_vis.shape[0]
+    if abs_angle_diff(angle, direction) > np.pi / 2 and abs_angle_diff(get_angle(vp2), angle) > np.pi / 2 and not is_on_screen:
+        candidates.append((score, vp))
+
+candidates = sorted(candidates, key=lambda x: x[0])
+print("candidates", candidates[:10])
+vp3 = candidates[0][1]
+print("vp3 angle", get_angle(vp3) / np.pi * 180)
+
+finalized_canvas = np.zeros_like(canvas)
+finalized_canvas[offset_y:offset_y + hough_vis.shape[0], offset_x:offset_x + hough_vis.shape[1]] = hough_vis
+
+finalized_vps = [top_point, vp2, vp3]
+colors = [(255, 0, 0), (0, 255, 255), (255, 0, 255)]
+labels = ["VP1", "VP2", "VP3"]
+
+for i, pt in enumerate(finalized_vps):
+    x, y = int(pt[0] + offset_x), int(pt[1] + offset_y)
+    cv2.circle(finalized_canvas, (x, y), 15, colors[i], -1)
+    cv2.putText(finalized_canvas, labels[i], (x + 10, y - 10), cv2.FONT_HERSHEY_SIMPLEX, 0.8, colors[i], 2)
+
+save(finalized_canvas, "finalized_vanishing_points.png")
