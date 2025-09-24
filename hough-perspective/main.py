@@ -3,6 +3,7 @@ from PIL import Image
 import os
 import cv2
 from copy import deepcopy
+from scipy.optimize import least_squares
 from tqdm import trange
 from tqdm import tqdm
 from stl import mesh
@@ -118,7 +119,7 @@ y_bins = np.arange(min_y, max_y, step_size)
 new_votes = []
 new_vote_vote_counts = []
 for x in tqdm(x_bins, leave=False):
-    for y in tqdm(y_bins, leave=False):
+    for y in y_bins:
         new_vote_vote_counts.append(0)
         new_votes.append((x,y))
         for vote in votes:
@@ -126,7 +127,7 @@ for x in tqdm(x_bins, leave=False):
                 new_vote_vote_counts[-1] += 1
 
 newer_votes = [] 
-for vote in new_votes:
+for vote in tqdm(new_votes, leave=False):
     real_votes_this_vote = []
     for real_vote in votes:
         if (vote[0] - real_vote[0])**2 + (vote[1] - real_vote[1])**2 < (step_size/2)**2:
@@ -252,37 +253,35 @@ save(finalized_canvas, "finalized_vanishing_points.png")
 
 
 # From chatgpt. I don't know camera math or linear algebra rigorously enough. There doesn't seem to be a simple tutorial or a simple function to do this.
-vps_h = [np.array([x, y, 1.0]) for (x, y) in finalized_vps]
-A = []
-for (i, j) in [(0,1), (0,2), (1,2)]:
-    v1, v2 = vps_h[i], vps_h[j]
-    A.append([
-        v1[0]*v2[0],
-        v1[0]*v2[1] + v1[1]*v2[0],
-        v1[1]*v2[1],
-        v1[0]*v2[2] + v1[2]*v2[0],
-        v1[1]*v2[2] + v1[2]*v2[1]
-    ])
-A = np.array(A)
+def residuals(params, vps):
+    f, cx, cy = params
+    K = np.array([[f, 0, cx],
+                  [0, f, cy],
+                  [0, 0, 1]])
+    vps_h = [np.array([u,v,1.0]) for u,v in vps]
+    r = []
+    for (i,j) in [(0,1),(0,2),(1,2)]:
+        d1 = np.linalg.inv(K) @ vps_h[i]
+        d2 = np.linalg.inv(K) @ vps_h[j]
+        r.append(d1.dot(d2))
+    return r
 
-# Solve Aw = 0
-_, _, Vt = np.linalg.svd(A)
-w = Vt[-1,:]
-w11, w12, w22, w13, w23 = w
+def estimate_K_from_vps(vps, img_width, img_height):
+    # initial guess: focal = image width, principal point = image center
+    x0 = [img_width, img_width/2, img_height/2]
+    res = least_squares(residuals, x0, args=(vps,))
+    f, cx, cy = res.x
+    K = np.array([[f, 0, cx],
+                  [0, f, cy],
+                  [0, 0, 1]])
+    return K
 
-# Build IAC matrix W
-W = np.array([
-    [w11, w12, w13],
-    [w12, w22, w23],
-    [w13, w23, 1.0]
-])
+# Estimate K from vanishing points and image size
+img_width, img_height = hough_vis.shape[1], hough_vis.shape[0]
+K = estimate_K_from_vps(finalized_vps, img_width, img_height)
 
-# Compute K from W
-K_inv = np.linalg.cholesky(np.linalg.inv(W)).T
-K = np.linalg.inv(K_inv)
-K /= K[2,2]
-
-# Rotation matrix from vanishing points
+# Compute rotation matrix from vanishing points
+vps_h = [np.array([u,v,1.0]) for u,v in finalized_vps]
 dirs = [np.linalg.inv(K) @ v for v in vps_h]
 dirs = [d / np.linalg.norm(d) for d in dirs]
 R = np.column_stack(dirs)
@@ -290,18 +289,43 @@ if np.linalg.det(R) < 0: R *= -1
 
 print("Intrinsic matrix K:\n", K)
 print("Rotation matrix R:\n", R)
+print(np.linalg.det(R))
 
 
 
-def project(p):
-    p_h = np.array([p[0], p[1], 1.0])
-    p_cam = K @ (R @ p_h)
-    p_cam /= p_cam[2]
-    return p_cam[0], p_cam[1]
+import numpy as np
+
+def project_point(p, t=None):
+    if t is None:
+        t = np.zeros((3,1))
+    X_h = np.array([p[0], p[1], p[2], 1.0]).reshape(4,1)  
+    Rt = np.hstack([R, t.reshape(3,1)])
+    P = K @ Rt
+    x = P @ X_h
+    x /= x[2]
+    return x[0,0], x[1,0]
 
 
 
 car_mesh = mesh.Mesh.from_file('car.stl')
 car_points = np.unique(car_mesh.vectors.reshape(-1, 3), axis=0)
 car_points = car_points / np.max(car_points)
-print(car_points)
+car_points -= np.mean(car_points, axis=0)
+car_points *= 200.0
+car_points += np.array([0, 0, 600])
+
+projected = np.array([project_point(p) for p in car_points])
+print(projected)
+# cube points
+#projected = np.array([project_point(p) for p in [[-1,-1,1],[1,-1,1],[1,1,1],[-1,1,1],[-1,-1,-1],[1,-1,-1],[1,1,-1],[-1,1,-1]]]) * 200
+vis_with_car = finalized_canvas.copy()
+print( vis_with_car.shape[1], vis_with_car.shape[0], offset_x, offset_y)
+
+for p in projected:
+    x, y = int(p[0] + offset_x), int(p[1] + offset_y)
+    print("trying", x, y)
+    if 0 <= x < vis_with_car.shape[1] and 0 <= y < vis_with_car.shape[0]:
+        print("PLACING", x, y)
+        cv2.circle(vis_with_car, (x, y), 20, (255, 0, 255), -1)
+
+save(vis_with_car, "with_car.png")
