@@ -5,6 +5,7 @@ import cv2
 from copy import deepcopy
 from tqdm import trange
 from tqdm import tqdm
+from stl import mesh
 
 def save(img, file="out.png"):
     im = Image.fromarray(img)  # (img * 255).astype(np.uint8)
@@ -247,3 +248,60 @@ for i, pt in enumerate(finalized_vps):
     cv2.putText(finalized_canvas, labels[i], (x + 10, y - 10), cv2.FONT_HERSHEY_SIMPLEX, 0.8, colors[i], 2)
 
 save(finalized_canvas, "finalized_vanishing_points.png")
+
+
+
+# From chatgpt. I don't know camera math or linear algebra rigorously enough. There doesn't seem to be a simple tutorial or a simple function to do this.
+vps_h = [np.array([x, y, 1.0]) for (x, y) in finalized_vps]
+A = []
+for (i, j) in [(0,1), (0,2), (1,2)]:
+    v1, v2 = vps_h[i], vps_h[j]
+    A.append([
+        v1[0]*v2[0],
+        v1[0]*v2[1] + v1[1]*v2[0],
+        v1[1]*v2[1],
+        v1[0]*v2[2] + v1[2]*v2[0],
+        v1[1]*v2[2] + v1[2]*v2[1]
+    ])
+A = np.array(A)
+
+# Solve Aw = 0
+_, _, Vt = np.linalg.svd(A)
+w = Vt[-1,:]
+w11, w12, w22, w13, w23 = w
+
+# Build IAC matrix W
+W = np.array([
+    [w11, w12, w13],
+    [w12, w22, w23],
+    [w13, w23, 1.0]
+])
+
+# Compute K from W
+K_inv = np.linalg.cholesky(np.linalg.inv(W)).T
+K = np.linalg.inv(K_inv)
+K /= K[2,2]
+
+# Rotation matrix from vanishing points
+dirs = [np.linalg.inv(K) @ v for v in vps_h]
+dirs = [d / np.linalg.norm(d) for d in dirs]
+R = np.column_stack(dirs)
+if np.linalg.det(R) < 0: R *= -1
+
+print("Intrinsic matrix K:\n", K)
+print("Rotation matrix R:\n", R)
+
+
+
+def project(p):
+    p_h = np.array([p[0], p[1], 1.0])
+    p_cam = K @ (R @ p_h)
+    p_cam /= p_cam[2]
+    return p_cam[0], p_cam[1]
+
+
+
+car_mesh = mesh.Mesh.from_file('car.stl')
+car_points = np.unique(car_mesh.vectors.reshape(-1, 3), axis=0)
+car_points = car_points / np.max(car_points)
+print(car_points)
