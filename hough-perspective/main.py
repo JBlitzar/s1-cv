@@ -306,26 +306,28 @@ def project_point(p, t=None):
     return x[0,0], x[1,0]
 
 
+vis_with_model = finalized_canvas.copy()
+model_mesh = mesh.Mesh.from_file('teapot.stl')
+model_points = np.unique(model_mesh.vectors.reshape(-1, 3), axis=0)
+model_points = model_points / np.max(model_points)
+model_points -= np.mean(model_points, axis=0)
+model_points *= np.array([1,-1,1])
+model_points *= 200.0
+model_points += np.array([0, 0, 600])
+model_points += np.array([vis_with_model.shape[1] / 2, vis_with_model.shape[0] / 2, 0])
 
-car_mesh = mesh.Mesh.from_file('car.stl')
-car_points = np.unique(car_mesh.vectors.reshape(-1, 3), axis=0)
-car_points = car_points / np.max(car_points)
-car_points -= np.mean(car_points, axis=0)
-car_points *= 200.0
-car_points += np.array([0, 0, 600])
-
-projected = np.array([project_point(p) for p in car_points])
+projected = np.array([project_point(p) for p in model_points])
 print(projected)
 # cube points
 #projected = np.array([project_point(p) for p in [[-1,-1,1],[1,-1,1],[1,1,1],[-1,1,1],[-1,-1,-1],[1,-1,-1],[1,1,-1],[-1,1,-1]]]) * 200
-vis_with_car = finalized_canvas.copy()
-print( vis_with_car.shape[1], vis_with_car.shape[0], offset_x, offset_y)
+
+print( vis_with_model.shape[1], vis_with_model.shape[0], offset_x, offset_y)
 
 for p in projected:
     x, y = int(p[0] + offset_x), int(p[1] + offset_y)
     print("trying", x, y)
-    if 0 <= x < vis_with_car.shape[1] and 0 <= y < vis_with_car.shape[0]:
+    if 0 <= x < vis_with_model.shape[1] and 0 <= y < vis_with_model.shape[0]:
         print("PLACING", x, y)
-        cv2.circle(vis_with_car, (x, y), 20, (255, 0, 255), -1)
+        cv2.circle(vis_with_model, (x, y), 2, (255, 0, 255), -1)
 
-save(vis_with_car, "with_car.png")
+save(vis_with_model, "with_model.png")
