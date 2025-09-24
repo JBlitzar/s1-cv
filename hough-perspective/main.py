@@ -311,7 +311,7 @@ model_mesh = mesh.Mesh.from_file('teapot.stl')
 model_points = np.unique(model_mesh.vectors.reshape(-1, 3), axis=0)
 model_points = model_points / np.max(model_points)
 model_points -= np.mean(model_points, axis=0)
-model_points *= np.array([1,-1,1])
+model_points *= np.array([1,1,-1])
 model_points *= 200.0
 model_points += np.array([0, 0, 600])
 model_points += np.array([vis_with_model.shape[1] / 2, vis_with_model.shape[0] / 2, 0])
