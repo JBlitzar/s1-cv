@@ -30,6 +30,7 @@ if img.shape[2] == 4:
 # Claude Sonnet 4 via github copilot used to refactor `oop.py` into the file seen here (faster I guess, less oop.)
 # prompt used: eliminate the pixel class and instead operate on rows of pixels at a time. So store energies in a numpy array, cumulative energies in a numpy array, and parents in a numpy array
 # After looking at the implementation, I re-coded populate() myself
+# I subsequently modified the code a lot to make it actually work, haha
 class PixelGrid:
     def __init__(self, img, energies=None):
         if energies is None:
@@ -48,28 +49,20 @@ class PixelGrid:
     def populate(self):
         self.cumulative[0, :] = self.energies[0, :]
 
-        for row in range(self.height):
-            # print(row)
-            # if row != 0:
-            #     for pixel in self.pixels[row]:
-            #         pixel.post_reception()
-            # for pixel in self.pixels[row]:
-            #     pixel.advertise_around()
+        for row in range(1, self.height):
             for x in range(self.width):
                 min_energy = np.inf
-                best_parent = -1
+                best_parent = 0
 
                 for offset in [-1, 0, 1]:
-                    # scan parent positions
                     potential_y = row - 1
                     potential_x = x + offset
-                    try:
+
+                    if 0 <= potential_x < self.width:
                         energy = self.cumulative[potential_y][potential_x]
                         if energy < min_energy:
                             best_parent = offset
                             min_energy = energy
-                    except IndexError:
-                        pass
 
                 self.cumulative[row][x] = min_energy + self.energies[row][x]
                 self.parents[row][x] = best_parent
@@ -82,7 +75,7 @@ class PixelGrid:
         for y in range(self.height - 1, -1, -1):
             seam.append((current_x, y))
             if y > 0:
-                current_x = self.parents[y, current_x]
+                current_x += self.parents[y, current_x]
 
         self.seam = seam[::-1]
 
