@@ -33,24 +33,23 @@ if img.shape[2] == 4:
 class PixelGrid:
     def __init__(self, img, energies=None):
         if energies is None:
-            energies = cv2.Canny(img, 100, 200)
+            energies = cv2.Canny(np.array(img, dtype="uint8"), 100, 200)
 
         self.energies = energies.astype(np.float64)
-        self.img = img
+        self.img = np.array(img, dtype="uint8")
         self.height, self.width = energies.shape
 
-        self.cumulative = np.full((self.height, self.width), np.inf) # cumulative energies
+        self.cumulative = np.full(
+            (self.height, self.width), np.inf
+        )  # cumulative energies
         self.parents = np.full((self.height, self.width), -1, dtype=np.int32)
         self.seam = None
-
-    
 
     def populate(self):
         self.cumulative[0, :] = self.energies[0, :]
 
-
-        for row in range(len(self.height)):
-            #print(row)
+        for row in range(self.height):
+            # print(row)
             # if row != 0:
             #     for pixel in self.pixels[row]:
             #         pixel.post_reception()
@@ -60,7 +59,7 @@ class PixelGrid:
                 min_energy = np.inf
                 best_parent = -1
 
-                for offset in [-1,0,1]:
+                for offset in [-1, 0, 1]:
                     # scan parent positions
                     potential_y = row - 1
                     potential_x = x + offset
@@ -71,7 +70,7 @@ class PixelGrid:
                             min_energy = energy
                     except IndexError:
                         pass
-                
+
                 self.cumulative[row][x] = min_energy + self.energies[row][x]
                 self.parents[row][x] = best_parent
 
@@ -90,8 +89,8 @@ class PixelGrid:
     def visualize(self):
         img2 = self.img.copy()
         for pixel in self.seam:
-            img2[pixel.y, pixel.x] = [255,0,255]
-        
+            img2[pixel[1], pixel[0]] = [255, 0, 255]
+
         save(img2)
 
     def remove_seam(self):
@@ -103,7 +102,7 @@ class PixelGrid:
         for row_idx in range(len(img2)):
             row = deepcopy(img2[row_idx])
             p = seam_rev[row_idx]
-            del row[p.x]
+            del row[p[0]]
 
             new_rows.append(row)
         save(np.array(new_rows, dtype="uint8"))
@@ -116,8 +115,9 @@ grid.visualize()
 new = grid.remove_seam()
 
 cur = new
-for i in trange(500):
+for i in trange(200):
     grid = PixelGrid(cur)
     grid.populate()
     grid.visualize()
     cur = grid.remove_seam()
+    cur = np.array(cur, dtype="uint8")
