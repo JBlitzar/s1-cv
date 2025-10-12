@@ -64,7 +64,7 @@ class PixelGrid:
                     potential_y = row - 1
                     potential_x = x + offset
                     try:
-                        energy = self.energies[potential_y][potential_x]
+                        energy = self.cumulative[potential_y][potential_x]
                         if energy < min_energy:
                             best_parent = offset
                             min_energy = energy
