@@ -36,25 +36,7 @@ class FeatureDescriptor:
                 best_distance = dist
                 best_match = other
         return best_match
-
-def obtain_featuredescriptors(path):
-    img_orig = np.array(Image.open(path), dtype=np.uint8)
-
-    print(img_orig.shape)
-    img = cv2.cvtColor(img_orig, cv2.COLOR_RGB2GRAY)
-    img = (img / np.max(img) * 255).astype(np.uint8)
-    img = cv2.equalizeHist(img) # attempt to make features invariant to lighting changes
-    features = cv2.goodFeaturesToTrack(img,100,0.01,10)
-    features = np.int32(features)
-    print("Magically obtained features found with cv2.goodFeaturesToTrack. Length: ", len(features))
-    drawing_img = img_orig.copy()
-    for f in features:
-        x, y = f.ravel()
-        cv2.circle(drawing_img, (x, y), 10, (0, 255, 0), -1)
-    save(drawing_img, "features.png")
-
-
-    def descriptor(img, x, y, size=16):
+def descriptor(img, x, y, size=16):
         patch = img[y - size//2:y + size//2, x - size//2:x + size//2]
 
         #??? do something so it's invariant to rotation
@@ -74,6 +56,24 @@ def obtain_featuredescriptors(path):
 
         desc = patch.flatten()
         return desc
+def obtain_featuredescriptors(path):
+    img_orig = np.array(Image.open(path), dtype=np.uint8)
+
+    print(img_orig.shape)
+    img = cv2.cvtColor(img_orig, cv2.COLOR_RGB2GRAY)
+    img = (img / np.max(img) * 255).astype(np.uint8)
+    img = cv2.equalizeHist(img) # attempt to make features invariant to lighting changes
+    features = cv2.goodFeaturesToTrack(img,100,0.01,10)
+    features = np.int32(features)
+    print("Magically obtained features found with cv2.goodFeaturesToTrack. Length: ", len(features))
+    drawing_img = img_orig.copy()
+    for f in features:
+        x, y = f.ravel()
+        cv2.circle(drawing_img, (x, y), 10, (0, 255, 0), -1)
+    save(drawing_img, "features.png")
+
+
+    
 
     features = np.int32(features)
     descriptors = np.array([descriptor(img, f[0][0], f[0][1]) for f in features])
@@ -161,8 +161,24 @@ def match_next_image_RANSAC_builtin(descriptors1, descriptors2):
 
     return H
 
+def prepare(img):
+    img = np.array(img, dtype=np.uint8)
+    img = cv2.cvtColor(img, cv2.COLOR_RGB2GRAY)
+    img = (img / np.max(img) * 255).astype(np.uint8)
+    img = cv2.equalizeHist(img)
+    return img
 
 if __name__ == "__main__":
+
+    
+
+    dt1 = descriptor(prepare(Image.open("sample_imgs/test1.jpg")), 8, 8)
+    dt2 = descriptor(prepare(Image.open("sample_imgs/test2.jpg")), 8, 8)
+    dt3 = descriptor(prepare(Image.open("sample_imgs/test3_different.jpg")), 8, 8)
+
+    print("Descriptor distance test for same image: ", np.linalg.norm(dt1 - dt2))
+    print("Descriptor distance test for different image: ", np.linalg.norm(dt1 - dt3))
+
 
     d1 = obtain_featuredescriptors("images/1.jpg")
     d2 = obtain_featuredescriptors("images/2.jpg")

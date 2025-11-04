@@ -8,3 +8,7 @@ Did some research. Here's the general outline of how this should work.
 
 
 Got feature detection working with `cv2.goodFeaturesToTrack`. I'll try to implement the descriptor algorithm by myself though because that's the heart of this. For the same reason I didn't recode the convolution operation when doing canny edge detector but I still didn't just use cv2.cannyEdgeDetector. But I did use cv2.cannyedgedetector for seam carving because that's just the starting step. 
+
+Implemented it fully, but seems like descriptor computation is a bit lacking currently
+- Descriptor distance test for same image:  2466.896025372776
+- Descriptor distance test for different image:  2192.1872638987757
