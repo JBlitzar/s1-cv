@@ -29,7 +29,7 @@ def compute_homography(kps1, kps2, matches, ransac_thresh=5.0):
     H, mask = cv2.findHomography(pts2, pts1, cv2.RANSAC, ransac_thresh)
     return H, mask
 
-def stitch(img1, img2, H):
+def stitch(img1, img2, H): # ai-generated
     h1, w1 = img1.shape[:2]
     h2, w2 = img2.shape[:2]
     corners_img2 = np.float32([[0,0],[0,h2],[w2,h2],[w2,0]]).reshape(-1,1,2)
