@@ -37,6 +37,7 @@ class FeatureDescriptor:
                 best_match = other
         return best_match
 def descriptor(img, x, y, size=16):
+    
         patch = img[y - size//2:y + size//2, x - size//2:x + size//2]
 
         #??? do something so it's invariant to rotation
@@ -56,6 +57,13 @@ def descriptor(img, x, y, size=16):
 
         desc = patch.flatten()
         return desc
+def descriptor_SIFT(img, x, y): # ai-generated function (gpt-5). Used for test PoC only, I hope to implement my own descriptor
+    sift = cv2.SIFT_create()
+    x = int(x)
+    y = int(y)
+    keypoint = cv2.KeyPoint(x, y, 1)
+    _, descriptor = sift.compute(img, [keypoint])
+    return descriptor[0]
 def obtain_featuredescriptors(path):
     img_orig = np.array(Image.open(path), dtype=np.uint8)
 
@@ -63,6 +71,7 @@ def obtain_featuredescriptors(path):
     img = cv2.cvtColor(img_orig, cv2.COLOR_RGB2GRAY)
     img = (img / np.max(img) * 255).astype(np.uint8)
     img = cv2.equalizeHist(img) # attempt to make features invariant to lighting changes
+    img = cv2.GaussianBlur(img, (5, 5), 0)
     features = cv2.goodFeaturesToTrack(img,100,0.01,10)
     features = np.int32(features)
     print("Magically obtained features found with cv2.goodFeaturesToTrack. Length: ", len(features))
@@ -76,7 +85,7 @@ def obtain_featuredescriptors(path):
     
 
     features = np.int32(features)
-    descriptors = np.array([descriptor(img, f[0][0], f[0][1]) for f in features])
+    descriptors = np.array([descriptor_SIFT(img, f[0][0], f[0][1]) for f in features])
 
     print("Computed descriptors. Shape: ", descriptors.shape)
 
@@ -110,8 +119,10 @@ def match_next_image(descriptors1, descriptors2):
             transformed = np.dot(H, np.array([p.x, p.y, 1]))
             transformed /= transformed[2]
 
-            closest = p.get_closest_xy_match(descriptors2)
-            sim = p.compute_similarity(closest)
+            newp = FeatureDescriptor(transformed[0], transformed[1], p.descriptor)
+
+            closest = newp.get_closest_xy_match(descriptors2)
+            sim = newp.compute_similarity(closest)
             score += sim
 
         return H, score
@@ -166,15 +177,16 @@ def prepare(img):
     img = cv2.cvtColor(img, cv2.COLOR_RGB2GRAY)
     img = (img / np.max(img) * 255).astype(np.uint8)
     img = cv2.equalizeHist(img)
+    img = cv2.GaussianBlur(img, (5, 5), 0)
     return img
 
 if __name__ == "__main__":
 
     
 
-    dt1 = descriptor(prepare(Image.open("sample_imgs/test1.jpg")), 8, 8)
-    dt2 = descriptor(prepare(Image.open("sample_imgs/test2.jpg")), 8, 8)
-    dt3 = descriptor(prepare(Image.open("sample_imgs/test3_different.jpg")), 8, 8)
+    dt1 = descriptor_SIFT(prepare(Image.open("sample_imgs/test1.jpg")), 8, 8)
+    dt2 = descriptor_SIFT(prepare(Image.open("sample_imgs/test2.jpg")), 8, 8)
+    dt3 = descriptor_SIFT(prepare(Image.open("sample_imgs/test3_different.jpg")), 8, 8)
 
     print("Descriptor distance test for same image: ", np.linalg.norm(dt1 - dt2))
     print("Descriptor distance test for different image: ", np.linalg.norm(dt1 - dt3))
