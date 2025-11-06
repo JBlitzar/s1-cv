@@ -3,7 +3,7 @@ import numpy as np
 from PIL import Image
 import sys
 import random
-from tqdm import trange
+from tqdm import trange, tqdm
 
 
 class FeatureDescriptor:
@@ -42,16 +42,26 @@ def match_next_image(descriptors1, descriptors2):
         if H is None:
             return np.eye(3), float("inf")
         score = 0.0
-        for p in descriptors1:
-            transformed = H @ np.array([p.x, p.y, 1.0])
+
+        # I had ai (claude sonnet 4) optimize this (which was previously O(n^2) WITH object instantiation each time) because I don't have the bandwidth to do it myself atm
+        transform_point = np.array([0.0, 0.0, 1.0])
+        for p in tqdm(descriptors1, leave=False):
+            transform_point[0] = p.x
+            transform_point[1] = p.y
+            transformed = H @ transform_point
             transformed /= transformed[2]
-            newp = FeatureDescriptor(transformed[0], transformed[1], p.descriptor)
-            closest = newp.get_closest_xy_match(descriptors2)
-            score += newp.compute_similarity(closest)
+
+            best_match, best_distance = None, float("inf")
+            for other in descriptors2:
+                dist = np.hypot(transformed[0] - other.x, transformed[1] - other.y)
+                if dist < best_distance:
+                    best_distance, best_match = dist, other
+
+            score += np.linalg.norm(p.descriptor - best_match.descriptor)
         return H, score
 
     best_H, best_score = None, float("inf")
-    for _ in trange(1000):
+    for _ in trange(1000, desc="RANSAC iterations"):
         H, score = attempt_get_homography()
         if score < best_score:
             best_H, best_score = H, score
