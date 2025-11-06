@@ -32,32 +32,45 @@ class FeatureDescriptor:
         return best_match
 
 
+# I had ai (claude sonnet 4) optimize this function (which was previously O(n^2) in python loops WITH object instantiation each time) because I don't have the bandwidth to do it myself atm
+# it's still O(n^2) but it's vectorized with numpy which is the thing that really matters in the end
+
+
 def match_next_image(descriptors1, descriptors2):
+    pts1_array = np.array([[d.x, d.y] for d in descriptors1], dtype=np.float32)
+    pts2_array = np.array([[d.x, d.y] for d in descriptors2], dtype=np.float32)
+    desc1_array = np.array([d.descriptor for d in descriptors1], dtype=np.float32)
+    desc2_array = np.array([d.descriptor for d in descriptors2], dtype=np.float32)
+
     def attempt_get_homography():
-        pts1 = random.choices(descriptors1, k=4)
-        pts2 = [p.get_closest_match(descriptors2) for p in pts1]
-        H, _ = cv2.findHomography(
-            np.array([[p.x, p.y] for p in pts1]), np.array([[p.x, p.y] for p in pts2])
-        )
+        indices = np.random.choice(len(descriptors1), 4, replace=False)
+        pts1_sample = pts1_array[indices]
+
+        pts2_sample = []
+        for idx in indices:
+            desc_diffs = np.linalg.norm(desc2_array - desc1_array[idx], axis=1)
+            best_idx = np.argmin(desc_diffs)
+            pts2_sample.append(pts2_array[best_idx])
+        pts2_sample = np.array(pts2_sample)
+
+        H, _ = cv2.findHomography(pts1_sample, pts2_sample)
         if H is None:
             return np.eye(3), float("inf")
-        score = 0.0
 
-        # I had ai (claude sonnet 4) optimize this (which was previously O(n^2) WITH object instantiation each time) because I don't have the bandwidth to do it myself atm
-        transform_point = np.array([0.0, 0.0, 1.0])
-        for p in tqdm(descriptors1, leave=False):
-            transform_point[0] = p.x
-            transform_point[1] = p.y
-            transformed = H @ transform_point
-            transformed /= transformed[2]
+        pts1_homogeneous = np.column_stack([pts1_array, np.ones(len(pts1_array))])
+        transformed = (H @ pts1_homogeneous.T).T
+        transformed = transformed[:, :2] / transformed[:, 2:3]
 
-            best_match, best_distance = None, float("inf")
-            for other in descriptors2:
-                dist = np.hypot(transformed[0] - other.x, transformed[1] - other.y)
-                if dist < best_distance:
-                    best_distance, best_match = dist, other
+        distances = np.linalg.norm(
+            transformed[:, np.newaxis, :] - pts2_array[np.newaxis, :, :], axis=2
+        )
+        closest_indices = np.argmin(distances, axis=1)
 
-            score += np.linalg.norm(p.descriptor - best_match.descriptor)
+        descriptor_diffs = np.linalg.norm(
+            desc1_array - desc2_array[closest_indices], axis=1
+        )
+        score = np.sum(descriptor_diffs)
+
         return H, score
 
     best_H, best_score = None, float("inf")
