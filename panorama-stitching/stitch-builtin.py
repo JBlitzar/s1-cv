@@ -43,33 +43,35 @@ def match_next_image(descriptors1, descriptors2):
     desc2_array = np.array([d.descriptor for d in descriptors2], dtype=np.float32)
 
     def attempt_get_homography():
-        indices = np.random.choice(len(descriptors1), 4, replace=False)
-        pts1_sample = pts1_array[indices]
+        indices = np.random.choice(len(descriptors2), 4, replace=False)
+        pts2_sample = pts2_array[indices]
 
-        pts2_sample = []
+        pts1_sample = []
         for idx in indices:
-            desc_diffs = np.linalg.norm(desc2_array - desc1_array[idx], axis=1)
+            desc_diffs = np.linalg.norm(desc1_array - desc2_array[idx], axis=1)
             best_idx = np.argmin(desc_diffs)
-            pts2_sample.append(pts2_array[best_idx])
-        pts2_sample = np.array(pts2_sample)
+            pts1_sample.append(pts1_array[best_idx])
+        pts1_sample = np.array(pts1_sample)
 
-        H, _ = cv2.findHomography(pts1_sample, pts2_sample)
+        # Map img2 -> img1 (consistent with working version)
+        H, _ = cv2.findHomography(pts2_sample, pts1_sample)
         if H is None:
             return np.eye(3), float("inf")
 
-        pts1_homogeneous = np.column_stack([pts1_array, np.ones(len(pts1_array))])
-        transformed = (H @ pts1_homogeneous.T).T
+        # Transform all pts2 to img1 space
+        pts2_homogeneous = np.column_stack([pts2_array, np.ones(len(pts2_array))])
+        transformed = (H @ pts2_homogeneous.T).T
         transformed = transformed[:, :2] / transformed[:, 2:3]
 
+        # Find geometric inliers (reprojection error < threshold)
         distances = np.linalg.norm(
-            transformed[:, np.newaxis, :] - pts2_array[np.newaxis, :, :], axis=2
+            transformed[:, np.newaxis, :] - pts1_array[np.newaxis, :, :], axis=2
         )
-        closest_indices = np.argmin(distances, axis=1)
+        min_distances = np.min(distances, axis=1)
 
-        descriptor_diffs = np.linalg.norm(
-            desc1_array - desc2_array[closest_indices], axis=1
-        )
-        score = np.sum(descriptor_diffs)
+        threshold = 5.0  # pixels
+        inliers = min_distances < threshold
+        score = -np.sum(inliers)  # Negative because we want to maximize inliers
 
         return H, score
 
@@ -78,7 +80,7 @@ def match_next_image(descriptors1, descriptors2):
         H, score = attempt_get_homography()
         if score < best_score:
             best_H, best_score = H, score
-    print("Best score:", best_score)
+    print("Best score (negative inlier count):", best_score)
     return best_H
 
 
@@ -153,6 +155,8 @@ if __name__ == "__main__":
     print(f"Matches found: {len(matches)}")
 
     H, mask = compute_homography(kps1, kps2, matches)
+    print("Computed homography:")
+    print(H)
     if H is None:
         print("Not enough matches to compute homography.")
         sys.exit(1)
@@ -161,17 +165,14 @@ if __name__ == "__main__":
     save(stitched, "stitched.jpg")
     print("Saved stitched.jpg")
 
-    # Incremental test: reuse SIFT keypoints/descriptors but estimate H via custom match_next_image
+    img1, kps1, desc1 = detect_and_compute(img1_path)
+    img2, kps2, desc2 = detect_and_compute(img2_path)
     fd1 = to_feature_descriptors(kps1, desc1)
     fd2 = to_feature_descriptors(kps2, desc2)
     if len(fd1) >= 4 and len(fd2) >= 4:
-        H12 = match_next_image(fd1, fd2)  # maps img1 -> img2
-        try:
-            H21 = np.linalg.inv(H12)
-            stitched_custom = stitch(img1, img2, H21)
-            save(stitched_custom, "stitched_custom.jpg")
-            print("Saved stitched_custom.jpg")
-        except np.linalg.LinAlgError:
-            print("Custom H was singular; skipping stitched_custom.jpg")
-    else:
-        print("Not enough features for custom matcher.")
+        H = match_next_image(fd1, fd2)  # maps img2 -> img1 (correct direction)
+        print("Calculated homography:")
+        print(H)
+        stitched_custom = stitch(img1, img2, H)
+        save(stitched_custom, "stitched_custom.jpg")
+        print("Saved stitched_custom.jpg")
