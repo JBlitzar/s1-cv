@@ -1,3 +1,4 @@
+import time
 import cv2
 import numpy as np
 from PIL import Image
@@ -43,6 +44,7 @@ def match_next_image(descriptors1, descriptors2):
     desc2_array = np.array([d.descriptor for d in descriptors2], dtype=np.float32)
 
     def attempt_get_homography():
+        t0 = time.time()
         indices = np.random.choice(len(descriptors2), 4, replace=False)
         pts2_sample = pts2_array[indices]
 
@@ -52,16 +54,26 @@ def match_next_image(descriptors1, descriptors2):
             best_idx = np.argmin(desc_diffs)
             pts1_sample.append(pts1_array[best_idx])
         pts1_sample = np.array(pts1_sample)
+        t1 = time.time()
 
         # Map img2 -> img1 (consistent with working version)
         H, _ = cv2.findHomography(pts2_sample, pts1_sample)
         if H is None:
             return np.eye(3), float("inf")
+        t2 = time.time()
 
         # Transform all pts2 to img1 space
         pts2_homogeneous = np.column_stack([pts2_array, np.ones(len(pts2_array))])
         transformed = (H @ pts2_homogeneous.T).T
         transformed = transformed[:, :2] / transformed[:, 2:3]
+        t3 = time.time()
+
+        unique_transformed = np.unique(transformed, axis=0)
+        if len(unique_transformed) < len(transformed) * 0.5:
+            # More than half the points collapsed to same locations
+            print("haha")
+            return np.eye(3), float("inf")
+        t4 = time.time()
 
         # Find geometric inliers (reprojection error < threshold)
         distances = np.linalg.norm(
@@ -69,17 +81,29 @@ def match_next_image(descriptors1, descriptors2):
         )
         min_distances = np.min(distances, axis=1)
 
-        threshold = 5.0  # pixels
+        threshold = 2.0  # pixels
         inliers = min_distances < threshold
         score = -np.sum(inliers)  # Negative because we want to maximize inliers
 
+        if score < best_score:
+            print(f"\nNew best: {-score} inliers")
+            print(f"Mean error: {np.mean(min_distances):.2f}")
+            print(f"Median error: {np.median(min_distances):.2f}")
+            print(f"Min error: {np.min(min_distances):.2f}")
+
+        t5 = time.time()
+        a = [t0, t1, t2, t3, t4, t5]
+        for idx, i in enumerate(a[1:]):
+            print(f"  Step {idx} time: {i - a[idx]:.4f} sec")
         return H, score
 
     best_H, best_score = None, float("inf")
+
     for _ in trange(1000, desc="RANSAC iterations"):
         H, score = attempt_get_homography()
         if score < best_score:
             best_H, best_score = H, score
+
     print("Best score (negative inlier count):", best_score)
     return best_H
 
