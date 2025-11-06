@@ -20,3 +20,5 @@ Working on incrementally adding back stuff from main.py into stitch-builtin unti
 My builtin RANSAC doesn't work and I don't know why. Maybe it's just not enough iterations? I timed stuff to identify bottlenecks.
 
 Soo I just vectorized with numpy and increased the number of keypoints. Except now all of the points are collapsing??
+
+I've now spent an hour on this and still don't know why it's not working. Yes, I tried asking AI.

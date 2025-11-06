@@ -56,7 +56,7 @@ def match_next_image(descriptors1, descriptors2):
         pts1_sample = np.array(pts1_sample)
         t1 = time.time()
 
-        # Map img2 -> img1 (consistent with working version)
+        # Map img2 -> img1
         H, _ = cv2.findHomography(pts2_sample, pts1_sample)
         if H is None:
             return np.eye(3), float("inf")
