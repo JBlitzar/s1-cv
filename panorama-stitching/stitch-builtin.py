@@ -93,13 +93,13 @@ def match_next_image(descriptors1, descriptors2):
 
         t5 = time.time()
         a = [t0, t1, t2, t3, t4, t5]
-        for idx, i in enumerate(a[1:]):
-            print(f"  Step {idx} time: {i - a[idx]:.4f} sec")
+        # for idx, i in enumerate(a[1:]):
+        #     print(f"  Step {idx} time: {i - a[idx]:.4f} sec")
         return H, score
 
     best_H, best_score = None, float("inf")
 
-    for _ in trange(1000, desc="RANSAC iterations"):
+    for _ in trange(10_000, desc="RANSAC iterations"):
         H, score = attempt_get_homography()
         if score < best_score:
             best_H, best_score = H, score
@@ -117,7 +117,7 @@ def detect_and_compute(path):
     if img is None:
         raise FileNotFoundError(path)
     gray = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
-    sift = cv2.SIFT_create()
+    sift = cv2.SIFT_create(nfeatures=150)
     kps, desc = sift.detectAndCompute(gray, None)
     return img, kps, desc
 

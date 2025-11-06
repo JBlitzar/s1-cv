@@ -16,3 +16,7 @@ Implemented it fully, but seems like descriptor computation is a bit lacking cur
 Used AI to try the opencv builtin SIFT and it worked so now I have to debug my algorithm.
 
 Working on incrementally adding back stuff from main.py into stitch-builtin until stuff breaks.
+
+My builtin RANSAC doesn't work and I don't know why. Maybe it's just not enough iterations? I timed stuff to identify bottlenecks.
+
+Soo I just vectorized with numpy and increased the number of keypoints. Except now all of the points are collapsing??
