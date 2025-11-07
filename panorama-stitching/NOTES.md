@@ -34,3 +34,5 @@ Works pretty well. I rewrote the README a bit but will need to rewrite it again 
 TBD because atm stitching all the images together produces a... less than desireable result. Integrated error + overwriting as opposed to blending, I guess. I'll investigate further. 
 
 Iff *everything* works and I still have time, I'll add back my scuffed feature descriptor implementation. 
+
+I asked Wes and he thinks that the problems with stitching are solely due to lens distortion. But it's not that because lines are straight. I'm going to collect some higher-quality data in which photos are taken more densely.

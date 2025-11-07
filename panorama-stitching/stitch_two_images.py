@@ -163,8 +163,8 @@ def stitch(img1, img2, H):  # ai-generated image manipulation code
 
 
 if __name__ == "__main__":
-    img1_path = "images/1.jpg"
-    img2_path = "images/2.jpg"
+    img1_path = "images/8.jpg"
+    img2_path = "images/9.jpg"
 
     img1, kps1, desc1 = detect_and_compute(img1_path)
     img2, kps2, desc2 = detect_and_compute(img2_path)
@@ -201,6 +201,6 @@ if __name__ == "__main__":
     print("H.dtype: ", H.dtype)
     H_inv = np.linalg.inv(H)
 
-    stitched_custom = stitch(img1, img2, H_inv)
+    stitched_custom = stitch(img2, img1, H)
     save(stitched_custom, "stitched_custom.jpg")
     print("Saved stitched_custom.jpg")

@@ -52,7 +52,9 @@ def stitch_multi(imgs, homographies):
 
 
 if __name__ == "__main__":
-    imgs = sorted(glob.glob("images/*.jpg"))
+    imgs = sorted(glob.glob("images/*.jpg"), key=lambda x: int(x.split('/')[-1].split('.')[0]))
+    imgs = imgs[:15]
+    print("Images to be stitched:", imgs)
     homographies = []
 
     for i in trange(len(imgs) - 1, desc="Computing homographies for image pairs"):
