@@ -22,3 +22,9 @@ My builtin RANSAC doesn't work and I don't know why. Maybe it's just not enough 
 Soo I just vectorized with numpy and increased the number of keypoints. Except now all of the points are collapsing??
 
 I've now spent an hour on this and still don't know why it's not working. Yes, I tried asking AI.
+
+---
+
+I've gotten the homemade RANSAC implementation to work! I've migrated everything to main.py and deleted stitch-builtin.
+
+Using cv2 builtin to find descriptors and correlate the keypoints, but I implemented RANSAC + all the glue code myself, because I feel like those are the most important things to implement to understand what's going on. And the results look pretty great! see `stitched_custom.jpg`. 
