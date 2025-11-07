@@ -18,8 +18,9 @@ def stitch_multi(imgs, homographies):
 
     cumulative_H = [np.eye(3)]
     for H in homographies:
-        cumulative_H.append(cumulative_H[-1] @ H) # so all of the homographies map back to img 1
-
+        cumulative_H.append(
+            cumulative_H[-1] @ H
+        )  # so all of the homographies map back to img 1
 
     images = [cv2.imread(p) for p in imgs]
     # used ai (claude sonnet 4)
@@ -44,7 +45,7 @@ def stitch_multi(imgs, homographies):
     for img, H in zip(images, cumulative_H):
         H_final = H_translate @ H
         warped = cv2.warpPerspective(img, H_final, (pano_w, pano_h))
-        mask = (warped > 0)
+        mask = warped > 0
         result[mask] = warped[mask]
 
     return result
@@ -53,7 +54,6 @@ def stitch_multi(imgs, homographies):
 if __name__ == "__main__":
     imgs = sorted(glob.glob("images/*.jpg"))
     homographies = []
-
 
     for i in trange(len(imgs) - 1, desc="Computing homographies for image pairs"):
         img1, kps1, desc1 = detect_and_compute(imgs[i])

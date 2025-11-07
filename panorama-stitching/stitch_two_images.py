@@ -131,7 +131,8 @@ def compute_homography(kps1, kps2, matches, ransac_thresh=5.0):
     H, mask = cv2.findHomography(pts2, pts1, cv2.RANSAC, ransac_thresh)
     return H, mask
 
-def stitch(img1, img2, H): # ai-generated image manipulation code
+
+def stitch(img1, img2, H):  # ai-generated image manipulation code
     """
     Stitch two images together using the provided homography matrix.
     Args:
