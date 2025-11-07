@@ -1,5 +1,7 @@
 # Panorama Stitching
 
+<img src="stitched_custom.jpg" style="height: 50vw">
+
 Welcome to the subfolder! You'll find development notes in NOTES.md and code in the python files. `uv run stitch_two_images.py` to stitch two images. I'll hopefully update this with more explanations on the code and the images that it produces, but I'll try to write in NOTES.md as I go so you'll be able to see that.
 
 
