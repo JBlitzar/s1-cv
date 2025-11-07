@@ -2,34 +2,39 @@ from stitch_two_images import stitch, detect_and_compute, match_features, save, 
 import cv2
 import numpy as np
 import glob
+from tqdm import trange
 
 
 
 if __name__ == "__main__":
     imgs = sorted(glob.glob("images/*.jpg"))
 
-    # stitch 1 onto 2. Use that new image to stitch 3, etc.
-    i1 = imgs[0]
-    i2 = imgs[1]
-
-    for i in range(2, len(imgs)+1):
-        print(f"Stitching {i1} and {i2}...")
-        img1, kps1, desc1 = detect_and_compute(i1)
-        img2, kps2, desc2 = detect_and_compute(i2)
-
+    # get H mapping 2 onto 1, then 3 onto 2, then 4 onto 3, etc
+    # then stitch all together
+    homographies = []
+    for i in trange(len(imgs) - 1):
+        img1, kps1, desc1 = detect_and_compute(imgs[i])
+        img2, kps2, desc2 = detect_and_compute(imgs[i + 1])
         matches = match_features(desc1, desc2)
-        print(f"Matches found: {len(matches)}")
+        H, _ = match_next_image(kps1, kps2, matches)
+        homographies.append(H)
 
-        H, _ = compute_homography(kps1, kps2, matches)
-        
-        if H is None:
-            print("Not enough matches to compute homography.")
-            break
+    cumulative_homographies = []
+    cumulative_H = np.eye(3)
+    for H in homographies:
+        cumulative_H = cumulative_H.dot(H)
+        cumulative_homographies.append(np.linalg.inv(cumulative_H.copy()))
 
-        stitched = stitch(img1, img2, H)
-        save(stitched, "stitched_temp.jpg")
-        print("Saved stitched_temp.jpg")
+    for i in range(len(cumulative_homographies)):
+        print(f"Cumulative homography {i}:\n{cumulative_homographies[i]}\n")
+    stitched = cv2.imread(imgs[-1])
+    for i in trange(len(imgs) - 2, -1, -1):
+        img_next = cv2.imread(imgs[i])
+        H = cumulative_homographies[i]
+        stitched = stitch(stitched, img_next, H)
+    
+    save(stitched, "stitched_full.jpg")
 
-        i1 = "stitched_temp.jpg"
-        if i < len(imgs):
-            i2 = imgs[i]
+    
+
+    # save out whole stitched panorama with all images
