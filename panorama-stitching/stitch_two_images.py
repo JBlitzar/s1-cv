@@ -163,8 +163,8 @@ def stitch(img1, img2, H):  # ai-generated image manipulation code
 
 
 if __name__ == "__main__":
-    img1_path = "images-failure-case/22.jpg"
-    img2_path = "images-failure-case/23.jpg"
+    img1_path = "images/2.jpg"
+    img2_path = "images/3.jpg"
 
     img1, kps1, desc1 = detect_and_compute(img1_path)
     img2, kps2, desc2 = detect_and_compute(img2_path)
