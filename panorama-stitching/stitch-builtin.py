@@ -7,106 +7,55 @@ import random
 from tqdm import trange, tqdm
 
 
-class FeatureDescriptor:
-    def __init__(self, x, y, descriptor):
-        self.x = x
-        self.y = y
-        self.descriptor = descriptor
-
-    def compute_similarity(self, other):
-        return np.linalg.norm(self.descriptor - other.descriptor)
-
-    def get_closest_match(self, others):
-        best_match, best_distance = None, float("inf")
-        for other in others:
-            dist = self.compute_similarity(other)
-            if dist < best_distance:
-                best_distance, best_match = dist, other
-        return best_match
-
-    def get_closest_xy_match(self, others):
-        best_match, best_distance = None, float("inf")
-        for other in others:
-            dist = np.hypot(self.x - other.x, self.y - other.y)
-            if dist < best_distance:
-                best_distance, best_match = dist, other
-        return best_match
-
-
-# I had ai (claude sonnet 4) optimize this function (which was previously O(n^2) in python loops WITH object instantiation each time) because I don't have the bandwidth to do it myself atm
-# it's still O(n^2) but it's vectorized with numpy which is the thing that really matters in the end
-
-
-def match_next_image(descriptors1, descriptors2):
-    pts1_array = np.array([[d.x, d.y] for d in descriptors1], dtype=np.float32)
-    pts2_array = np.array([[d.x, d.y] for d in descriptors2], dtype=np.float32)
-    desc1_array = np.array([d.descriptor for d in descriptors1], dtype=np.float32)
-    desc2_array = np.array([d.descriptor for d in descriptors2], dtype=np.float32)
-
+def match_next_image(kps1, kps2, matches):
+    # reordered so that the same indices correspond to matches. 
+    pts1_array = np.array([kps1[m.queryIdx].pt for m in matches], dtype=np.float32) # array of [[x,y],[x,y],[x,y],...]
+    pts2_array = np.array([kps2[m.trainIdx].pt for m in matches], dtype=np.float32) # array of [[x,y],[x,y],[x,y],...]
     def attempt_get_homography():
-        t0 = time.time()
-        indices = np.random.choice(len(descriptors2), 4, replace=False)
-        pts2_sample = pts2_array[indices]
-
-        pts1_sample = []
-        for idx in indices:
-            desc_diffs = np.linalg.norm(desc1_array - desc2_array[idx], axis=1)
-            best_idx = np.argmin(desc_diffs)
-            pts1_sample.append(pts1_array[best_idx])
-        pts1_sample = np.array(pts1_sample)
-        t1 = time.time()
-
-        # Map img2 -> img1
-        H, _ = cv2.findHomography(pts2_sample, pts1_sample)
+        # get four random ones
+        # compute homography
+        # get score (transform points and compare to matches)
+        sample_indices = random.sample(range(len(pts1_array)), 4)
+        pts1_sample = pts1_array[sample_indices]
+        pts2_sample = pts2_array[sample_indices]
+        # print("Sampled pts1: ", pts1_sample)
+        # print("Sampled pts2: ", pts2_sample)
+        H, _ = cv2.findHomography(pts1_sample, pts2_sample)
         if H is None:
+            print("DING DING DING H IS NONE")
             return np.eye(3), float("inf")
-        t2 = time.time()
+        
+        
+        # get whole score
+        score = 0
+        # transform all pts1
+        # Claude sonnet 4 generated this snippet because I don't know linalg formally, haha
+        ones = np.ones((pts1_array.shape[0], 1), dtype=np.float32)
+        pts1_homogeneous = np.hstack((pts1_array, ones))
+        transformed_pts1 = (H @ pts1_homogeneous.T).T
+        transformed_pts1 /= transformed_pts1[:, 2][:, np.newaxis]
+        transformed_pts1_xy = transformed_pts1[:, :2]
+        # compute similarity
+        
+        for i in range(len(transformed_pts1_xy)):
+           # get corresponding pts2 and compare distance with linalg.norm
+           dist = np.linalg.norm(transformed_pts1_xy[i] - pts2_array[i])
+           score += dist
+           
 
-        # Transform all pts2 to img1 space
-        pts2_homogeneous = np.column_stack([pts2_array, np.ones(len(pts2_array))])
-        transformed = (H @ pts2_homogeneous.T).T
-        transformed = transformed[:, :2] / transformed[:, 2:3]
-        t3 = time.time()
-
-        unique_transformed = np.unique(transformed, axis=0)
-        if len(unique_transformed) < len(transformed) * 0.5:
-            # More than half the points collapsed to same locations
-            print("haha")
-            return np.eye(3), float("inf")
-        t4 = time.time()
-
-        # Find geometric inliers (reprojection error < threshold)
-        distances = np.linalg.norm(
-            transformed[:, np.newaxis, :] - pts1_array[np.newaxis, :, :], axis=2
-        )
-        min_distances = np.min(distances, axis=1)
-
-        threshold = 2.0  # pixels
-        inliers = min_distances < threshold
-        score = -np.sum(inliers)  # Negative because we want to maximize inliers
-
-        if score < best_score:
-            print(f"\nNew best: {-score} inliers")
-            print(f"Mean error: {np.mean(min_distances):.2f}")
-            print(f"Median error: {np.median(min_distances):.2f}")
-            print(f"Min error: {np.min(min_distances):.2f}")
-
-        t5 = time.time()
-        a = [t0, t1, t2, t3, t4, t5]
-        # for idx, i in enumerate(a[1:]):
-        #     print(f"  Step {idx} time: {i - a[idx]:.4f} sec")
+        
         return H, score
 
-    best_H, best_score = None, float("inf")
-
-    for _ in trange(10_000, desc="RANSAC iterations"):
+    best_H = None
+    best_score = float("inf")
+    for _ in trange(1000):
         H, score = attempt_get_homography()
         if score < best_score:
-            best_H, best_score = H, score
-
-    print("Best score (negative inlier count):", best_score)
-    return best_H
-
+            best_score = score
+            best_H = H
+    print("Best score: ", best_score)
+    print("Best H: ", best_H)
+    return best_H, best_score
 
 def save(img, name="out.jpg"):
     Image.fromarray(cv2.cvtColor(img, cv2.COLOR_BGR2RGB)).save(name)
@@ -121,14 +70,6 @@ def detect_and_compute(path):
     kps, desc = sift.detectAndCompute(gray, None)
     return img, kps, desc
 
-
-def to_feature_descriptors(kps, desc):
-    if desc is None or len(kps) == 0:
-        return []
-    return [
-        FeatureDescriptor(kp.pt[0], kp.pt[1], d.astype(np.float32))
-        for kp, d in zip(kps, desc)
-    ]
 
 
 def match_features(desc1, desc2, ratio=0.75):
@@ -177,10 +118,18 @@ if __name__ == "__main__":
 
     matches = match_features(desc1, desc2)
     print(f"Matches found: {len(matches)}")
+    print("matches[0].queryidx: ", matches[0].queryIdx,", matches[0].trainidx:", matches[0].trainIdx) # indices
+    print("Corresponding coordinates:")
+    print("kps1[queryIdx]: ", kps1[matches[0].queryIdx].pt)
+    print("kps2[trainIdx]: ", kps2[matches[0].trainIdx].pt)
 
-    H, mask = compute_homography(kps1, kps2, matches)
+    H, _ = compute_homography(kps1, kps2, matches)
     print("Computed homography:")
     print(H)
+    print(type(H))
+    print("Shape of H: ", H.shape
+    )
+    print("H.dtype: ", H.dtype)
     if H is None:
         print("Not enough matches to compute homography.")
         sys.exit(1)
@@ -191,12 +140,14 @@ if __name__ == "__main__":
 
     img1, kps1, desc1 = detect_and_compute(img1_path)
     img2, kps2, desc2 = detect_and_compute(img2_path)
-    fd1 = to_feature_descriptors(kps1, desc1)
-    fd2 = to_feature_descriptors(kps2, desc2)
-    if len(fd1) >= 4 and len(fd2) >= 4:
-        H = match_next_image(fd1, fd2)  # maps img2 -> img1 (correct direction)
-        print("Calculated homography:")
-        print(H)
-        stitched_custom = stitch(img1, img2, H)
-        save(stitched_custom, "stitched_custom.jpg")
-        print("Saved stitched_custom.jpg")
+    matches = match_features(desc1, desc2)
+
+    H, _ = match_next_image(kps1, kps2, matches)
+    print("Calculated homography:")
+    print(H)
+    print(type(H))
+    print("Shape of H: ", H.shape)
+    print("H.dtype: ", H.dtype)
+    stitched_custom = stitch(img2, img1, H)
+    save(stitched_custom, "stitched_custom.jpg")
+    print("Saved stitched_custom.jpg")
