@@ -1,224 +1,204 @@
+import time
 import cv2
 import numpy as np
 from PIL import Image
-import glob
+import sys
 import random
+from tqdm import trange, tqdm
 
 
-def save(img, name="out.jpg"):
-    im = Image.fromarray(img)  # (img * 255).astype(np.uint8)
-    im.save(name)
+def match_next_image(kps1, kps2, matches):
+    """
+    Compute homography using custom implementaiton of RANSAC-like approach by sampling matches.
+    Args:
 
+        kps1: Keypoints from image 1.
+        kps2: Keypoints from image 2.
+        matches: List of matched keypoints between the two images. (in the form of cv2.DMatch objects)
 
-class FeatureDescriptor:
-    def __init__(self, x, y, descriptor):
-        self.x = x
-        self.y = y
-        self.descriptor = descriptor
+    Returns:
+        best_H: The best homography matrix found.
+        best_score: The score of the best homography (lower is better).
+    """
 
-    def compute_similarity(self, other):
-        # euclidean distance I guess
-        return np.linalg.norm(self.descriptor - other.descriptor)
+    # reordered so that the same indices correspond to matches.
+    pts1_array = np.array(
+        [kps1[m.queryIdx].pt for m in matches], dtype=np.float32
+    )  # array of [[x,y],[x,y],[x,y],...]
+    pts2_array = np.array(
+        [kps2[m.trainIdx].pt for m in matches], dtype=np.float32
+    )  # array of [[x,y],[x,y],[x,y],...]
 
-    def get_closest_match(self, others):
-        best_match = None
-        best_distance = float("inf")
-        for other in others:
-            dist = self.compute_similarity(other)
-            if dist < best_distance:
-                best_distance = dist
-                best_match = other
-        return best_match
-
-    def get_closest_xy_match(self, others):
-        best_match = None
-        best_distance = float("inf")
-        for other in others:
-            dist = np.sqrt((self.x - other.x) ** 2 + (self.y - other.y) ** 2)
-            if dist < best_distance:
-                best_distance = dist
-                best_match = other
-        return best_match
-
-
-def descriptor(img, x, y, size=16):
-    patch = img[y - size // 2 : y + size // 2, x - size // 2 : x + size // 2]
-
-    # ??? do something so it's invariant to rotation
-    # rotate it based on something. Gradient?
-
-    gy, gx = np.gradient(patch)
-    magnitude = np.sqrt(gx**2 + gy**2)
-    angle = np.arctan2(gy, gx)
-    # pretty sure SIFT does something similar to this
-    hist, bin_edges = np.histogram(
-        angle, bins=36, range=(-np.pi, np.pi), weights=magnitude
-    )
-    dominant_angle = bin_edges[np.argmax(hist)]
-
-    M = cv2.getRotationMatrix2D((size // 2, size // 2), dominant_angle * 180 / np.pi, 1)
-    patch = cv2.warpAffine(patch, M, (size, size))
-
-    # NOT scale-invariant but hopefully doesn't really matter on a small enough patch size. Fine tune size to get enough detail without noticing scale changes
-
-    desc = patch.flatten()
-    return desc
-
-
-def descriptor_SIFT(
-    img, x, y
-):  # ai-generated function (gpt-5). Used for test PoC only, I hope to implement my own descriptor
-    sift = cv2.SIFT_create()
-    x = int(x)
-    y = int(y)
-    keypoint = cv2.KeyPoint(x, y, 1)
-    _, descriptor = sift.compute(img, [keypoint])
-    return descriptor[0]
-
-
-def obtain_featuredescriptors(path):
-    img_orig = np.array(Image.open(path), dtype=np.uint8)
-
-    print(img_orig.shape)
-    img = cv2.cvtColor(img_orig, cv2.COLOR_RGB2GRAY)
-    img = (img / np.max(img) * 255).astype(np.uint8)
-    img = cv2.equalizeHist(
-        img
-    )  # attempt to make features invariant to lighting changes
-    img = cv2.GaussianBlur(img, (5, 5), 0)
-    features = cv2.goodFeaturesToTrack(img, 100, 0.01, 10)
-    features = np.int32(features)
-    print(
-        "Magically obtained features found with cv2.goodFeaturesToTrack. Length: ",
-        len(features),
-    )
-    drawing_img = img_orig.copy()
-    for f in features:
-        x, y = f.ravel()
-        cv2.circle(drawing_img, (x, y), 10, (0, 255, 0), -1)
-    save(drawing_img, "keypoints.png")
-
-    features = np.int32(features)
-    descriptors = np.array([descriptor_SIFT(img, f[0][0], f[0][1]) for f in features])
-
-    print("Computed descriptors. Shape: ", descriptors.shape)
-
-    feature_descriptors = [
-        FeatureDescriptor(f[0][0], f[0][1], desc)
-        for f, desc in zip(features, descriptors)
-    ]
-
-    return feature_descriptors
-
-
-def match_next_image(descriptors1, descriptors2):
-    # RANSAC
-    # get four random points
-    # compute homography
-    # get whole score
-    # repeat
     def attempt_get_homography():
-        pts1 = random.choices(descriptors1, k=4)
-        pts2 = [p.get_closest_match(descriptors2) for p in pts1]
-
+        # get four random ones
         # compute homography
-        H, _ = cv2.findHomography(
-            np.array([[p.x, p.y] for p in pts1]), np.array([[p.x, p.y] for p in pts2])
-        )
+        # get score (transform points and compare to matches)
+        sample_indices = random.sample(range(len(pts1_array)), 4)
+        pts1_sample = pts1_array[sample_indices]
+        pts2_sample = pts2_array[sample_indices]
+        # print("Sampled pts1: ", pts1_sample)
+        # print("Sampled pts2: ", pts2_sample)
+        H, _ = cv2.findHomography(pts1_sample, pts2_sample)
         if H is None:
             print("DING DING DING H IS NONE")
             return np.eye(3), float("inf")
 
         # get whole score
         score = 0
-        for p in descriptors1:
-            transformed = np.dot(H, np.array([p.x, p.y, 1]))
-            transformed /= transformed[2]
+        # transform all pts1
+        # Claude sonnet 4 generated this snippet because I don't know linalg formally, haha
+        ones = np.ones((pts1_array.shape[0], 1), dtype=np.float32)
+        pts1_homogeneous = np.hstack((pts1_array, ones))
+        transformed_pts1 = (H @ pts1_homogeneous.T).T
+        transformed_pts1 /= transformed_pts1[:, 2][:, np.newaxis]
+        transformed_pts1_xy = transformed_pts1[:, :2]
+        # compute similarity
 
-            newp = FeatureDescriptor(transformed[0], transformed[1], p.descriptor)
-
-            closest = newp.get_closest_xy_match(descriptors2)
-            sim = newp.compute_similarity(closest)
-            score += sim
+        for i in range(len(transformed_pts1_xy)):
+            # get corresponding pts2 and compare distance with linalg.norm
+            dist = np.linalg.norm(transformed_pts1_xy[i] - pts2_array[i])
+            score += dist
 
         return H, score
 
-    # repeat
     best_H = None
     best_score = float("inf")
-    for _ in range(1000):
+    for _ in trange(1000):
         H, score = attempt_get_homography()
         if score < best_score:
             best_score = score
             best_H = H
     print("Best score: ", best_score)
-    return best_H
+    print("Best H: ", best_H)
+    return best_H, best_score
 
 
-def match_next_image_RANSAC_builtin(descriptors1, descriptors2):
-    # RANSAC
-    # get four random points
-    # compute homography
-    # get whole score
-    # repeat
+def save(img, name="out.jpg"):
+    Image.fromarray(cv2.cvtColor(img, cv2.COLOR_BGR2RGB)).save(name)
 
-    # compute homography
-    H, _ = cv2.findHomography(
-        np.array([[p.x, p.y] for p in descriptors1]),
-        np.array(
-            [
-                [p.x, p.y]
-                for p in [dp1.get_closest_match(descriptors2) for dp1 in descriptors1]
-            ]
+
+def detect_and_compute(path):
+    """Detect keypoints and compute descriptors for an image using cv2's builtin SIFT.
+    Args:
+        path: Path to the image file.
+    Returns:
+        img: The loaded image.
+        kps: Detected keypoints.
+        desc: Computed descriptors.
+    """
+    img = cv2.imread(path)
+    if img is None:
+        raise FileNotFoundError(path)
+    gray = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
+    sift = cv2.SIFT_create(nfeatures=150)
+    kps, desc = sift.detectAndCompute(gray, None)
+    return img, kps, desc
+
+
+# ai-generated feature matching function (just uses builtin apis, no algorithmic complexity here)
+# claude sonnet 4 via github copilot
+def match_features(desc1, desc2, ratio=0.75):
+    """Match features between two sets of descriptors using the ratio test and cv2's builtin BFMatcher and knnMatch.
+    Args:
+
+        desc1: Descriptors from image 1.
+        desc2: Descriptors from image 2.
+        ratio: Ratio threshold for the ratio test.
+    Returns:
+        good: List of good matches that passed the ratio test."""
+    bf = cv2.BFMatcher(cv2.NORM_L2)
+    knn = bf.knnMatch(desc1, desc2, k=2)
+    good = [m for m, n in knn if m.distance < ratio * n.distance]
+    return good
+
+
+# ai-generated homography computation function (just uses builtin apis, no algorithmic complexity here)
+# claude sonnet 4 via github copilot
+def compute_homography(kps1, kps2, matches, ransac_thresh=5.0):
+    """Compute homography between two sets of keypoints using matched features and cv2's builtin findHomography with RANSAC.
+    Args:
+        kps1: Keypoints from image 1.
+        kps2: Keypoints from image 2.
+        matches: List of matched keypoints between the two images. (in the form of cv2.DMatch objects)
+        ransac_thresh: RANSAC reprojection threshold.
+    Returns:
+        H: The computed homography matrix.
+        mask: Mask of inliers used in the homography computation. (unused)"""
+    if len(matches) < 4:
+        return None, None
+    pts1 = np.float32([kps1[m.queryIdx].pt for m in matches]).reshape(-1, 1, 2)
+    pts2 = np.float32([kps2[m.trainIdx].pt for m in matches]).reshape(-1, 1, 2)
+    H, mask = cv2.findHomography(pts2, pts1, cv2.RANSAC, ransac_thresh)
+    return H, mask
+
+
+def stitch(img1, img2, H):  # ai-generated image manipulation code.
+    """
+    Stitch two images together using the provided homography matrix.
+    Args:
+        img1: The first image (to be the base).
+        img2: The second image (to be warped and stitched onto the first).
+        H: The homography matrix mapping img2 to img1.
+    Returns:
+        result: The stitched panorama image in the form of a numpy array.
+    """
+    h1, w1 = img1.shape[:2]
+    h2, w2 = img2.shape[:2]
+    corners_img2 = np.float32([[0, 0], [0, h2], [w2, h2], [w2, 0]]).reshape(-1, 1, 2)
+    warped_corners = cv2.perspectiveTransform(corners_img2, H)
+    all_corners = np.concatenate(
+        (
+            np.float32([[0, 0], [0, h1], [w1, h1], [w1, 0]]).reshape(-1, 1, 2),
+            warped_corners,
         ),
-        cv2.RANSAC,
+        axis=0,
     )
-
-    if H is None:
-        print("DING DING DING H IS NONE")
-        return np.eye(3), float("inf")
-
-    H = np.array(H)
-
-    # get whole score
-    score = 0
-    for p in descriptors1:
-        transformed = np.dot(H, np.array([p.x, p.y, 1]))
-        transformed /= transformed[2]
-
-        closest = p.get_closest_xy_match(descriptors2)
-        sim = p.compute_similarity(closest)
-        score += sim
-
-    print("RANSAC Best score: ", score)
-
-    return H
-
-
-def prepare(img):
-    img = np.array(img, dtype=np.uint8)
-    img = cv2.cvtColor(img, cv2.COLOR_RGB2GRAY)
-    img = (img / np.max(img) * 255).astype(np.uint8)
-    img = cv2.equalizeHist(img)
-    img = cv2.GaussianBlur(img, (5, 5), 0)
-    return img
+    x_min, y_min = np.int32(all_corners.min(axis=0).ravel() - 0.5)
+    x_max, y_max = np.int32(all_corners.max(axis=0).ravel() + 0.5)
+    translate = [-x_min, -y_min]
+    H_trans = np.array([[1, 0, translate[0]], [0, 1, translate[1]], [0, 0, 1]])
+    result = cv2.warpPerspective(img2, H_trans.dot(H), (x_max - x_min, y_max - y_min))
+    result[translate[1] : translate[1] + h1, translate[0] : translate[0] + w1] = img1
+    return result
 
 
 if __name__ == "__main__":
-    dt1 = descriptor_SIFT(prepare(Image.open("sample_imgs/test1.jpg")), 8, 8)
-    dt2 = descriptor_SIFT(prepare(Image.open("sample_imgs/test2.jpg")), 8, 8)
-    dt3 = descriptor_SIFT(prepare(Image.open("sample_imgs/test3_different.jpg")), 8, 8)
+    img1_path = "images/1.jpg"
+    img2_path = "images/2.jpg"
 
-    print("Descriptor distance test for same image: ", np.linalg.norm(dt1 - dt2))
-    print("Descriptor distance test for different image: ", np.linalg.norm(dt1 - dt3))
+    img1, kps1, desc1 = detect_and_compute(img1_path)
+    img2, kps2, desc2 = detect_and_compute(img2_path)
 
-    d1 = obtain_featuredescriptors("images/1.jpg")
-    d2 = obtain_featuredescriptors("images/2.jpg")
-    H = match_next_image_RANSAC_builtin(d1, d2)
-    print("Estimated homography: ")
+    matches = match_features(desc1, desc2)
+    print(f"Matches found: {len(matches)}")
+    print(
+        "matches[0].queryidx: ",
+        matches[0].queryIdx,
+        ", matches[0].trainidx:",
+        matches[0].trainIdx,
+    )  # indices
+    print("Corresponding coordinates:")
+    print("kps1[queryIdx]: ", kps1[matches[0].queryIdx].pt)
+    print("kps2[trainIdx]: ", kps2[matches[0].trainIdx].pt)
+
+    H, _ = compute_homography(kps1, kps2, matches)
+    print("Computed homography (builtin opencv):")
     print(H)
 
-    # apply H to d2
-    img2 = np.array(Image.open("images/2.jpg"), dtype=np.uint8)
-    img2_warped = cv2.warpPerspective(img2, H, (img2.shape[1] * 2, img2.shape[0] * 2))
-    save(img2_warped, "warped.jpg")
+    stitched = stitch(img1, img2, H)
+    save(stitched, "stitched.jpg")
+    print("Saved stitched.jpg")
+
+    img1, kps1, desc1 = detect_and_compute(img1_path)
+    img2, kps2, desc2 = detect_and_compute(img2_path)
+    matches = match_features(desc1, desc2)
+
+    H, _ = match_next_image(kps1, kps2, matches)
+    print("Calculated homography:")
+    print(H)
+    print(type(H))
+    print("Shape of H: ", H.shape)
+    print("H.dtype: ", H.dtype)
+    stitched_custom = stitch(img2, img1, H)
+    save(stitched_custom, "stitched_custom.jpg")
+    print("Saved stitched_custom.jpg")
