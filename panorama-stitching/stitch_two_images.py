@@ -63,7 +63,7 @@ def match_next_image(kps1, kps2, matches):
 
     best_H = None
     best_score = float("inf")
-    for _ in trange(1000):
+    for _ in trange(10_000, leave=False, desc="RANSAC iterations"):
         H, score = attempt_get_homography()
         if score < best_score:
             best_score = score
