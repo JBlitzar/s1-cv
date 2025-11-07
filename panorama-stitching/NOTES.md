@@ -28,3 +28,9 @@ I've now spent an hour on this and still don't know why it's not working. Yes, I
 I've gotten the homemade RANSAC implementation to work! I've migrated everything to main.py and deleted stitch-builtin.
 
 Using cv2 builtin to find descriptors and correlate the keypoints, but I implemented RANSAC + all the glue code myself, because I feel like those are the most important things to implement to understand what's going on. And the results look pretty great! see `stitched_custom.jpg`. 
+
+Works pretty well. I rewrote the README a bit but will need to rewrite it again because I changed the API / entry points / added more files.
+
+TBD because atm stitching all the images together produces a... less than desireable result. Integrated error + overwriting as opposed to blending, I guess. I'll investigate further. 
+
+Iff *everything* works and I still have time, I'll add back my scuffed feature descriptor implementation. 
