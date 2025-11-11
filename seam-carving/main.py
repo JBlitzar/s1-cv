@@ -15,13 +15,13 @@ from copy import deepcopy
 from tqdm import trange
 
 
-def save(img):
+def save(img, name="out.png"):
     im = Image.fromarray(img)  # (img * 255).astype(np.uint8)
-    im.save("out.png")
+    im.save(name)
 
 
 # read image
-img = np.array(Image.open("mercator.png"))
+img = np.array(Image.open("biker.png"))
 
 if img.shape[2] == 4:
     img = img[:, :, :3]
@@ -34,7 +34,11 @@ if img.shape[2] == 4:
 class PixelGrid:
     def __init__(self, img, energies=None):
         if energies is None:
-            energies = cv2.Canny(np.array(img, dtype="uint8"), 100, 200)
+            gray = cv2.cvtColor(np.array(img, dtype="uint8"), cv2.COLOR_RGB2GRAY)
+            sobel_x = cv2.Sobel(gray, cv2.CV_64F, 1, 0, ksize=3)
+            sobel_y = cv2.Sobel(gray, cv2.CV_64F, 0, 1, ksize=3)
+            energies = np.sqrt(sobel_x**2 + sobel_y**2)
+            save(energies.astype(np.uint8), "energies.png")
 
         self.energies = energies.astype(np.float64)
         self.img = np.array(img, dtype="uint8")
