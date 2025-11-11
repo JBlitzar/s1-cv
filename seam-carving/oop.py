@@ -14,13 +14,13 @@ import cv2
 from copy import deepcopy
 from tqdm import trange
 
-def save(img, name="out.png"):
+def save(img):
     im = Image.fromarray(img) # (img * 255).astype(np.uint8)
-    im.save(name)
+    im.save("out.png")
 
 
 # read image
-img = np.array(Image.open("biker.png"))
+img = np.array(Image.open("image.png"))
 # # get energies
 # energies = cv2.Canny(img, 100, 200)
 # print(energies.shape) # 651, 960
@@ -35,7 +35,6 @@ class PixelGrid:
             energies = cv2.Canny(img, 100, 200)
 
         self.energies = energies
-        save(self.energies.astype(np.uint8), "energies.png")
 
         self.pixels = np.array([[Pixel(x,y,self) for x in range(len(img[y]))] for y in range(len(img))])
         self.img = img
