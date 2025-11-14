@@ -17,3 +17,8 @@ Hmm. This strategy seems promising but it still needs some cleaning up. Current 
 
 
 This is going to be very meta, but most errors currently stem from things flashing and then dissapearing, like the image shifting. So we store diff of diffs and only keep the ones in common.
+
+
+Well, it turns out that opencv has exactly what we're trying to do built in. The problem of detecting moving objects over a static background is not new. So, I just used `createBackgroundSubtractorMOG2`. And it works brilliantly!
+
+![](docs/mog2.png)
