@@ -12,8 +12,9 @@ from PIL import Image
 import os
 import cv2
 from copy import deepcopy
-from tqdm import trange
+from tqdm import trange, tqdm
 
+print = tqdm.write
 
 def save(img, name="out.png"):
     im = Image.fromarray(img)  # (img * 255).astype(np.uint8)
@@ -21,10 +22,10 @@ def save(img, name="out.png"):
 
 
 # read image
-img = np.array(Image.open("biker.png"))
+a = np.array(Image.open("biker.png"))
 
-if img.shape[2] == 4:
-    img = img[:, :, :3]
+if a.shape[2] == 4:
+    a = a[:, :, :3]
 
 
 # Claude Sonnet 4 via github copilot used to refactor `oop.py` into the file seen here (faster I guess, less oop.)
@@ -32,16 +33,16 @@ if img.shape[2] == 4:
 # After looking at the implementation, I re-coded populate() myself
 # I subsequently modified the code a lot to make it actually work, haha
 class PixelGrid:
-    def __init__(self, img, energies=None):
+    def __init__(self, _img, energies=None):
         if energies is None:
-            gray = cv2.cvtColor(np.array(img, dtype="uint8"), cv2.COLOR_RGB2GRAY)
+            gray = cv2.cvtColor(np.array(_img, dtype="uint8"), cv2.COLOR_RGB2GRAY)
             sobel_x = cv2.Sobel(gray, cv2.CV_64F, 1, 0, ksize=3)
             sobel_y = cv2.Sobel(gray, cv2.CV_64F, 0, 1, ksize=3)
             energies = np.sqrt(sobel_x**2 + sobel_y**2)
             save(energies.astype(np.uint8), "energies.png")
 
         self.energies = energies.astype(np.float64)
-        self.img = np.array(img, dtype="uint8")
+        self.img = np.array(_img, dtype="uint8")
         self.height, self.width = energies.shape
 
         self.cumulative = np.full(
@@ -82,6 +83,8 @@ class PixelGrid:
                 current_x += self.parents[y, current_x]
 
         self.seam = seam[::-1]
+        # print best cumulative energy
+        print("Lowest cumulative energy:"+str(self.cumulative[-1, min_x]))
 
     def visualize(self):
         img2 = self.img.copy()
@@ -106,7 +109,7 @@ class PixelGrid:
         return new_rows
 
 
-grid = PixelGrid(img)
+grid = PixelGrid(a)
 grid.populate()
 grid.visualize()
 new = grid.remove_seam()
