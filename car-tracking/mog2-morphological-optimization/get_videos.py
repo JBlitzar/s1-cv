@@ -3,9 +3,18 @@ import time
 import uuid
 
 def save_5s(url):
+    id = str(uuid.uuid4())
     subprocess.run([
-        'ffmpeg', '-i', url, '-t', '5', '-c:v', 'libx264', '-c:a', 'aac', f'data/{uuid.uuid4()}.mp4'
+        'ffmpeg', '-i', url, '-t', '5', '-c:v', 'libx264', '-c:a', 'aac', f'data/{id}.mp4'
     ])
+    subprocess.run([
+        'ffmpeg', '-sseof', '-3', '-i', f'data/{id}.mp4', '-update', '1', '-q:v', '1', f'data/{id}_last_frame.png'
+    ])
+    subprocess.run([
+        'ffmpeg', '-sseof', '-3', '-i', f'data/{id}.mp4', '-update', '1', '-q:v', '1', f'data/{id}_mask.png'
+    ])
+
+
 
 # commented returns 404 ??
 urls = [
