@@ -1,8 +1,9 @@
 import glob
 import cv2
 import numpy as np
-# get all videos in `data/`, then extract uuid (part before.mp4). Then get associated image: data/{uuid}_last_frame.png. Then associated mask in data/masks/{uuid}_mask.png. Then filter for only those where all three files exist AND the mask contains some amount of rgb-white pixels (mask is actually labeled)
-
+import optuna
+from optuna.samplers import TPESampler
+from tqdm import tqdm
 video_files = glob.glob("data/*.mp4")
 image_files = glob.glob("data/*_last_frame.png")
 mask_files = glob.glob("data/masks/*_mask.png")
@@ -21,13 +22,13 @@ for vid in valid_ids:
 
 print("Valid IDs with non-empty masks:", final_ids)
 
-def run_mog2(id, erode_amount, dilate_amount, iterations, gaussian_blur_kernel_size, erode_kernel_size, dilate_kernel_size):
+def run_mog2(id, erode_amount, dilate_amount, gaussian_blur_kernel_size, erode_kernel_size, dilate_kernel_size, history, var_threshold):
     video_path = f"data/{id}.mp4"
     cap = cv2.VideoCapture(video_path)
 
     fgbg = cv2.createBackgroundSubtractorMOG2(
-        history=500,     
-        varThreshold=10,
+        history=history,     
+        varThreshold=var_threshold,
         detectShadows=False
     )
 
@@ -45,10 +46,8 @@ def run_mog2(id, erode_amount, dilate_amount, iterations, gaussian_blur_kernel_s
         img = cv2.convertScaleAbs(img, alpha=1.5, beta=0)
         mask = fgbg.apply(img)
 
-        # Apply morphological operations
-        for _ in range(iterations):
-            mask = cv2.erode(mask, erode_kernel, iterations=erode_amount)
-            mask = cv2.dilate(mask, dilate_kernel, iterations=dilate_amount)
+        mask = cv2.erode(mask, erode_kernel, iterations=erode_amount)
+        mask = cv2.dilate(mask, dilate_kernel, iterations=dilate_amount)
 
     cap.release()
 
@@ -59,3 +58,66 @@ def run_mog2(id, erode_amount, dilate_amount, iterations, gaussian_blur_kernel_s
 
     mse = np.mean((final_mask.astype(float) - true_mask.astype(float)) ** 2)
     return mse
+
+def objective(trial):
+    erode_amount = trial.suggest_int('erode_amount', 1, 5)
+    dilate_amount = trial.suggest_int('dilate_amount', 1, 5)
+    gaussian_blur_kernel_size = trial.suggest_categorical('gaussian_blur_kernel_size', [3, 5, 7, 9, 11,13,15,17,19,25,45])
+    erode_kernel_size = trial.suggest_int('erode_kernel_size', 1, 15, step=2)
+    dilate_kernel_size = trial.suggest_int('dilate_kernel_size', 1, 15, step=2)
+    history = trial.suggest_int('history', 100, 1000, step=50)
+    var_threshold = trial.suggest_float('var_threshold', 2.0, 50.0)
+    
+    total_mse = 0.0
+    valid_count = 0
+    
+    for video_id in tqdm(final_ids, leave=False):
+        try:
+            mse = run_mog2(
+                video_id, 
+                erode_amount, 
+                dilate_amount, 
+                gaussian_blur_kernel_size, 
+                erode_kernel_size, 
+                dilate_kernel_size,
+                history,
+                var_threshold
+            )
+            total_mse += mse
+            valid_count += 1
+        except Exception as e:
+            print(f"Error processing {video_id}: {e}")
+            continue
+    
+    if valid_count == 0:
+        return float('inf')
+    
+    average_mse = total_mse / valid_count
+    print(f"Trial {trial.number}: Average MSE = {average_mse:.6f}")
+    return average_mse
+
+if __name__ == "__main__":
+    print(f"Starting optimization with {len(final_ids)} valid videos")
+    
+    study = optuna.create_study(
+        direction='minimize',
+        sampler=TPESampler(seed=42)
+    )
+    
+    study.optimize(objective, n_trials=100)
+    
+    print("\nOptimization completed!")
+    print("Best parameters:")
+    for key, value in study.best_params.items():
+        print(f"  {key}: {value}")
+    print(f"Best MSE: {study.best_value:.6f}")
+    
+    with open('best.txt', 'w') as f:
+        f.write("Best parameters:\n")
+        for key, value in study.best_params.items():
+            f.write(f"  {key}: {value}\n")
+        f.write(f"Best MSE: {study.best_value:.6f}\n")
+    
+    import pandas as pd
+    df = study.trials_dataframe()
+    df.to_csv('optuna_results.csv', index=False)
