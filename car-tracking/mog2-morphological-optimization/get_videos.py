@@ -10,6 +10,8 @@ def save_5s(url):
     subprocess.run([
         'ffmpeg', '-sseof', '-3', '-i', f'data/{id}.mp4', '-update', '1', '-q:v', '1', f'data/{id}_last_frame.png'
     ])
+
+    # that way it's easy to draw over in gimp
     subprocess.run([
         'ffmpeg', '-sseof', '-3', '-i', f'data/{id}.mp4', '-update', '1', '-q:v', '1', f'data/{id}_mask.png'
     ])
