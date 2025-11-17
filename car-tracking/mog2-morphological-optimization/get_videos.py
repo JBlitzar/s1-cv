@@ -4,17 +4,22 @@ import uuid
 
 def save_5s(url):
     id = str(uuid.uuid4())
+    print("Processing URL:", url, "with ID:", id)
+    # download video
     subprocess.run([
         'ffmpeg', '-i', url, '-t', '5', '-c:v', 'libx264', '-c:a', 'aac', f'data/{id}.mp4'
-    ])
+    ], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+
+    # get last frame
     subprocess.run([
         'ffmpeg', '-sseof', '-3', '-i', f'data/{id}.mp4', '-update', '1', '-q:v', '1', f'data/{id}_last_frame.png'
-    ])
+    ], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
 
+    # get last frame, again
     # that way it's easy to draw over in gimp
     subprocess.run([
-        'ffmpeg', '-sseof', '-3', '-i', f'data/{id}.mp4', '-update', '1', '-q:v', '1', f'data/{id}_mask.png'
-    ])
+        'ffmpeg', '-sseof', '-3', '-i', f'data/{id}.mp4', '-update', '1', '-q:v', '1', f'data/masks/{id}_mask.png'
+    ], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
 
 
 
