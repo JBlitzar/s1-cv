@@ -22,7 +22,7 @@ for vid in valid_ids:
 
 print("Valid IDs with non-empty masks:", final_ids)
 
-def run_mog2(id, erode_amount, dilate_amount, gaussian_blur_kernel_size, erode_kernel_size, dilate_kernel_size, history, var_threshold):
+def run_mog2(id, erode_amount, dilate_amount, gaussian_blur_kernel_size, erode_kernel_size, dilate_kernel_size, history, var_threshold, erode_before_dilate=False, alpha=1.5, beta=0):
     video_path = f"data/{id}.mp4"
     cap = cv2.VideoCapture(video_path)
 
@@ -43,11 +43,15 @@ def run_mog2(id, erode_amount, dilate_amount, gaussian_blur_kernel_size, erode_k
         gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
         img = gray
         img = cv2.GaussianBlur(img, (gaussian_blur_kernel_size, gaussian_blur_kernel_size), 0)
-        img = cv2.convertScaleAbs(img, alpha=1.5, beta=0)
+        img = cv2.convertScaleAbs(img, alpha=alpha, beta=beta)
         mask = fgbg.apply(img)
 
-        mask = cv2.erode(mask, erode_kernel, iterations=erode_amount)
-        mask = cv2.dilate(mask, dilate_kernel, iterations=dilate_amount)
+        if erode_before_dilate:
+            mask = cv2.erode(mask, erode_kernel, iterations=erode_amount)
+            mask = cv2.dilate(mask, dilate_kernel, iterations=dilate_amount)
+        else:
+            mask = cv2.dilate(mask, dilate_kernel, iterations=dilate_amount)
+            mask = cv2.erode(mask, erode_kernel, iterations=erode_amount)
 
     cap.release()
 
@@ -65,8 +69,11 @@ def objective(trial):
     gaussian_blur_kernel_size = trial.suggest_categorical('gaussian_blur_kernel_size', [3, 5, 7, 9, 11,13,15,17,19,25,45])
     erode_kernel_size = trial.suggest_int('erode_kernel_size', 1, 15, step=2)
     dilate_kernel_size = trial.suggest_int('dilate_kernel_size', 1, 15, step=2)
-    history = trial.suggest_int('history', 100, 1000, step=50)
+    history = trial.suggest_int('history', 100, 1000)
     var_threshold = trial.suggest_float('var_threshold', 2.0, 50.0)
+    erode_before_dilate = trial.suggest_categorical('erode_before_dilate', [True, False])
+    alpha = trial.suggest_float('alpha', 0.25, 3.0)
+    beta = trial.suggest_float('beta', -50, 50)
     
     total_mse = 0.0
     valid_count = 0
@@ -81,7 +88,10 @@ def objective(trial):
                 erode_kernel_size, 
                 dilate_kernel_size,
                 history,
-                var_threshold
+                var_threshold,
+                erode_before_dilate,
+                alpha,
+                beta
             )
             total_mse += mse
             valid_count += 1
@@ -104,7 +114,7 @@ if __name__ == "__main__":
         sampler=TPESampler(seed=42)
     )
     
-    study.optimize(objective, n_trials=100)
+    study.optimize(objective, n_trials=1_000, show_progress_bar=True, n_jobs=4)
     
     print("\nOptimization completed!")
     print("Best parameters:")
