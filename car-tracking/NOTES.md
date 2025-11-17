@@ -26,3 +26,5 @@ Well, it turns out that opencv has exactly what we're trying to do built in. The
 Now it's a matter of tuning the parameters so it works well. 
 
 We have extra time on this project. I'm considering chopping five-second videos and labeling car masks at the end, then integrating over MOG2 and comparing to ground-truth masks. Then, I can just throw this through [Optuna](https://optuna.org/), since that works on any black-box metric. I did a similar thing to determine morphological parameters for a different computer vision project. It's not perfect, but it's something. 
+
+TIme to start a new experiment in `mog2-morphological-optimization/`

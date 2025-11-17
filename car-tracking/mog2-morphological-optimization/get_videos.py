@@ -1,0 +1,30 @@
+import subprocess
+import time
+import uuid
+
+def save_5s(url):
+    subprocess.run([
+        'ffmpeg', '-i', url, '-t', '5', '-c:v', 'libx264', '-c:a', 'aac', f'data/{uuid.uuid4()}.mp4'
+    ])
+
+# commented returns 404 ??
+urls = [
+    #"https://wzmedia.dot.ca.gov/D4/S280_on_Monterey_Bl.stream/playlist.m3u8",
+    "https://wzmedia.dot.ca.gov/D4/N280_at_Indiana_St.stream/playlist.m3u8",
+    #"https://wzmedia.dot.ca.gov/D4/N101_NOF_Willow_Rd.stream/playlist.m3u8",
+    "https://wzmedia.dot.ca.gov/D4/N101_at_Marsh_Rd.stream/playlist.m3u8",
+    "https://wzmedia.dot.ca.gov/D4/S101_NOF_84_Woodside_Rd.stream/playlist.m3u8",
+    "https://wzmedia.dot.ca.gov/D4/S101_at_Whipple_Av.stream/playlist.m3u8",
+    "https://wzmedia.dot.ca.gov/D4/N101_JSO_E_Hilldale_Bl.stream/playlist.m3u8",
+    "https://wzmedia.dot.ca.gov/D4/W92_at_El_Camino_Real.stream/playlist.m3u8",
+    "https://wzmedia.dot.ca.gov/D4/S101_JSO_San_Bruno_Av.stream/playlist.m3u8"
+]
+
+import concurrent.futures
+
+for _ in range(3):
+    with concurrent.futures.ThreadPoolExecutor() as executor:
+        futures = [executor.submit(save_5s, url) for url in urls]
+        for future in concurrent.futures.as_completed(futures):
+            future.result()
+    time.sleep(5)
