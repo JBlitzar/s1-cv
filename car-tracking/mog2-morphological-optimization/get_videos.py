@@ -17,7 +17,8 @@ urls = [
     "https://wzmedia.dot.ca.gov/D4/S101_at_Whipple_Av.stream/playlist.m3u8",
     "https://wzmedia.dot.ca.gov/D4/N101_JSO_E_Hilldale_Bl.stream/playlist.m3u8",
     "https://wzmedia.dot.ca.gov/D4/W92_at_El_Camino_Real.stream/playlist.m3u8",
-    "https://wzmedia.dot.ca.gov/D4/S101_JSO_San_Bruno_Av.stream/playlist.m3u8"
+    "https://wzmedia.dot.ca.gov/D4/S101_JSO_San_Bruno_Av.stream/playlist.m3u8",
+    "https://wzmedia.dot.ca.gov/D4/S101_at_280_Split.stream/playlist.m3u8"
 ]
 
 import concurrent.futures
