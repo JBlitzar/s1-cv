@@ -32,3 +32,13 @@ TIme to start a new experiment in `mog2-morphological-optimization/`.
 I've automated scraping in `get_videos.py`. Then, I just spent a bit of time in GIMP to label a few image masks. Then I let optuna run! (`main.py`)
 
 I'm just optimizing for MSE on masks. I sure hope it won't just collapse to all zeros. 
+
+<img src="docs/procedural_masking_1.png">
+
+So it works decently well! The farther-away cars aren't doing as well, but that's technically okay-ish. 
+
+Here's my brilliant idea to make scale-invariant morphology:
+    - Use aggressive erosion
+    - Get distance transform maxima
+    - Use maxima as a proxy for depth (nearest-neighbor filling in)
+    - Adjust kernel size based on "depth"

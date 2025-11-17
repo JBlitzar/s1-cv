@@ -1,12 +1,12 @@
 Best parameters:
-  erode_amount: 5
-  dilate_amount: 4
-  gaussian_blur_kernel_size: 5
+  erode_amount: 4
+  dilate_amount: 3
+  gaussian_blur_kernel_size: 9
   erode_kernel_size: 5
-  dilate_kernel_size: 5
-  history: 291
-  var_threshold: 6.492900004800566
+  dilate_kernel_size: 7
+  history: 829
+  var_threshold: 39.272081654732325
   erode_before_dilate: False
-  alpha: 0.31911100999278286
-  beta: -13.998842440102447
-Best MSE: 0.036603
+  alpha: 1.0649580139419523
+  beta: -44.09812489518433
+Best MSE: 0.037293

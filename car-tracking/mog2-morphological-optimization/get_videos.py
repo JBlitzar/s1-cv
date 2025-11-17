@@ -36,12 +36,12 @@ urls = [
     "https://wzmedia.dot.ca.gov/D4/S101_JSO_San_Bruno_Av.stream/playlist.m3u8",
     "https://wzmedia.dot.ca.gov/D4/S101_at_280_Split.stream/playlist.m3u8"
 ]
+if __name__ == "__main__":
+    import concurrent.futures
 
-import concurrent.futures
-
-for _ in range(3):
-    with concurrent.futures.ThreadPoolExecutor() as executor:
-        futures = [executor.submit(save_5s, url) for url in urls]
-        for future in concurrent.futures.as_completed(futures):
-            future.result()
-    time.sleep(5)
+    for _ in range(3):
+        with concurrent.futures.ThreadPoolExecutor() as executor:
+            futures = [executor.submit(save_5s, url) for url in urls]
+            for future in concurrent.futures.as_completed(futures):
+                future.result()
+        time.sleep(5)
