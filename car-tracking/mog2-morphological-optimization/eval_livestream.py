@@ -50,6 +50,8 @@ def run_mog2_stream(id, erode_amount, dilate_amount, gaussian_blur_kernel_size, 
     erode_kernel = cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (erode_kernel_size, erode_kernel_size))
     dilate_kernel = cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (dilate_kernel_size, dilate_kernel_size))
 
+    erode_kernel_v2 = cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (5, 5))
+
     while True:
         if is_stream:
             # Read frame from ffmpeg stdout
@@ -72,12 +74,16 @@ def run_mog2_stream(id, erode_amount, dilate_amount, gaussian_blur_kernel_size, 
         img = cv2.convertScaleAbs(img, alpha=alpha, beta=beta)
         mask = fgbg.apply(img)
 
+        cv2.imshow("mog2", mask)
+
         if erode_before_dilate:
             mask = cv2.erode(mask, erode_kernel, iterations=erode_amount)
             mask = cv2.dilate(mask, dilate_kernel, iterations=dilate_amount)
         else:
             mask = cv2.dilate(mask, dilate_kernel, iterations=dilate_amount)
             mask = cv2.erode(mask, erode_kernel, iterations=erode_amount)
+
+        # mask = cv2.erode(mask, erode_kernel_v2, iterations=1)
 
         cv2.imshow("Raw Frame", frame)
         cv2.imshow("Processed Frame", img)
@@ -96,22 +102,8 @@ def run_mog2_stream(id, erode_amount, dilate_amount, gaussian_blur_kernel_size, 
         dist_transform_normalized = cv2.normalize(dist_transform, None, 0, 255, cv2.NORM_MINMAX)
         dist_transform_colored = cv2.applyColorMap(dist_transform_normalized.astype(np.uint8), cv2.COLORMAP_JET)
         cv2.imshow("Distance Transform", dist_transform_colored)
-
-        # # Find local maxima in distance transform
-        # kernel = np.ones((3,3), np.uint8)
-        # local_maxima = cv2.dilate(dist_transform, kernel) == dist_transform
-        # local_maxima = local_maxima & (dist_transform > 0)
-
-        # # Get coordinates of maxima
-        # maxima_coords = np.where(local_maxima)
-        # maxima_points = list(zip(maxima_coords[1], maxima_coords[0]))
-
-        # # Create superimposed image with maxima
-        # maxima_superimposed = superimposed.copy()
-        # for point in maxima_points:
-        #     cv2.circle(maxima_superimposed, point, 3, (0, 255, 0), -1)
-
-        # cv2.imshow("Maxima Superimposed", maxima_superimposed)
+        
+        
 
         if cv2.waitKey(30) & 0xFF == ord('q'):
             break   
