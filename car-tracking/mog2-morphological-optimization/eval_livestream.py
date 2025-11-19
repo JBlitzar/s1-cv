@@ -8,7 +8,7 @@ import threading
 import sys
 
 
-def run_mog2_stream(id, erode_amount, dilate_amount, gaussian_blur_kernel_size, erode_kernel_size, dilate_kernel_size, history, var_threshold, erode_before_dilate=False, alpha=1.5, beta=0):
+def run_mog2_stream(id, erode_amount, dilate_amount, gaussian_blur_kernel_size, erode_kernel_size, dilate_kernel_size, history, var_threshold, erode_before_dilate=False):
     # Check if id is a valid index for urls list
     if isinstance(id, int) and 0 <= id < len(urls):
         # Stream from m3u8 URL using ffmpeg
@@ -44,13 +44,15 @@ def run_mog2_stream(id, erode_amount, dilate_amount, gaussian_blur_kernel_size, 
     fgbg = cv2.createBackgroundSubtractorMOG2(
         history=history,     
         varThreshold=var_threshold,
-        detectShadows=False
+        detectShadows=True
     )
+
+
 
     erode_kernel = cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (erode_kernel_size, erode_kernel_size))
     dilate_kernel = cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (dilate_kernel_size, dilate_kernel_size))
 
-    erode_kernel_v2 = cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (5, 5))
+
 
     while True:
         if is_stream:
@@ -68,10 +70,9 @@ def run_mog2_stream(id, erode_amount, dilate_amount, gaussian_blur_kernel_size, 
             if not ret:
                 break
 
-        gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
-        img = gray
+        # gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
+        img = frame
         img = cv2.GaussianBlur(img, (gaussian_blur_kernel_size, gaussian_blur_kernel_size), 0)
-        img = cv2.convertScaleAbs(img, alpha=alpha, beta=beta)
         mask = fgbg.apply(img)
 
         cv2.imshow("mog2", mask)
@@ -102,7 +103,7 @@ def run_mog2_stream(id, erode_amount, dilate_amount, gaussian_blur_kernel_size, 
         dist_transform_normalized = cv2.normalize(dist_transform, None, 0, 255, cv2.NORM_MINMAX)
         dist_transform_colored = cv2.applyColorMap(dist_transform_normalized.astype(np.uint8), cv2.COLORMAP_JET)
         cv2.imshow("Distance Transform", dist_transform_colored)
-        
+
         
 
         if cv2.waitKey(30) & 0xFF == ord('q'):
@@ -173,6 +174,6 @@ if __name__ == "__main__":
                 int(params['history']),
                 float(params['var_threshold']),
                 bool(params['erode_before_dilate']),
-                float(params['alpha']),
-                float(params['beta'])
+                float(params['clipLimit']),
+                int(params['tileGridSize'])
             )

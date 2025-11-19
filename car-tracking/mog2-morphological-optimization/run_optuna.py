@@ -22,15 +22,18 @@ for vid in valid_ids:
 
 print("Valid IDs with non-empty masks:", final_ids)
 
-def run_mog2(id, erode_amount, dilate_amount, gaussian_blur_kernel_size, erode_kernel_size, dilate_kernel_size, history, var_threshold, erode_before_dilate=False, alpha=1.5, beta=0):
+
+
+def run_mog2(id, erode_amount, dilate_amount, gaussian_blur_kernel_size, erode_kernel_size, dilate_kernel_size, history, var_threshold, erode_before_dilate=False):
     video_path = f"data/{id}.mp4"
     cap = cv2.VideoCapture(video_path)
 
     fgbg = cv2.createBackgroundSubtractorMOG2(
         history=history,     
         varThreshold=var_threshold,
-        detectShadows=False
+        detectShadows=True # detectShadows = true makes it not detect shadows. 
     )
+
 
     erode_kernel = cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (erode_kernel_size, erode_kernel_size))
     dilate_kernel = cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (dilate_kernel_size, dilate_kernel_size))
@@ -40,11 +43,16 @@ def run_mog2(id, erode_amount, dilate_amount, gaussian_blur_kernel_size, erode_k
         if not ret:
             break
 
-        gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
-        img = gray
+        # gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
+        # img = gray
+        img = frame
         img = cv2.GaussianBlur(img, (gaussian_blur_kernel_size, gaussian_blur_kernel_size), 0)
-        img = cv2.convertScaleAbs(img, alpha=alpha, beta=beta)
+
+        
         mask = fgbg.apply(img)
+
+        mask = mask > 200
+        mask = mask.astype(np.uint8) * 255
 
         if erode_before_dilate:
             mask = cv2.erode(mask, erode_kernel, iterations=erode_amount)
@@ -72,8 +80,6 @@ def objective(trial):
     history = trial.suggest_int('history', 100, 1000)
     var_threshold = trial.suggest_float('var_threshold', 2.0, 50.0)
     erode_before_dilate = trial.suggest_categorical('erode_before_dilate', [True, False])
-    alpha = trial.suggest_float('alpha', 0.25, 3.0)
-    beta = trial.suggest_float('beta', -50, 50)
     
     total_mse = 0.0
     valid_count = 0
@@ -90,8 +96,6 @@ def objective(trial):
                 history,
                 var_threshold,
                 erode_before_dilate,
-                alpha,
-                beta
             )
             total_mse += mse
             valid_count += 1

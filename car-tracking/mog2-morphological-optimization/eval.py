@@ -4,15 +4,16 @@ import cv2
 import numpy as np
 
 
-def run_mog2_stream(id, erode_amount, dilate_amount, gaussian_blur_kernel_size, erode_kernel_size, dilate_kernel_size, history, var_threshold, erode_before_dilate=False, alpha=1.5, beta=0):
+def run_mog2_stream(id, erode_amount, dilate_amount, gaussian_blur_kernel_size, erode_kernel_size, dilate_kernel_size, history, var_threshold, erode_before_dilate=False, clipLimit=1.5, tileGridSize=8):
     video_path = f"data/{id}.mp4"
     cap = cv2.VideoCapture(video_path)
 
     fgbg = cv2.createBackgroundSubtractorMOG2(
         history=history,     
         varThreshold=var_threshold,
-        detectShadows=False
+        detectShadows=True
     )
+
 
     erode_kernel = cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (erode_kernel_size, erode_kernel_size))
     dilate_kernel = cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (dilate_kernel_size, dilate_kernel_size))
@@ -22,10 +23,10 @@ def run_mog2_stream(id, erode_amount, dilate_amount, gaussian_blur_kernel_size, 
         if not ret:
             break
 
-        gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
-        img = gray
+        # gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
+        img = frame
         img = cv2.GaussianBlur(img, (gaussian_blur_kernel_size, gaussian_blur_kernel_size), 0)
-        img = cv2.convertScaleAbs(img, alpha=alpha, beta=beta)
+
         mask = fgbg.apply(img)
 
         cv2.imshow("mog2", mask)
@@ -104,6 +105,6 @@ if __name__ == "__main__":
                 int(params['history']),
                 float(params['var_threshold']),
                 bool(params['erode_before_dilate']),
-                float(params['alpha']),
-                float(params['beta'])
+                float(params['clipLimit']),
+                int(params['tileGridSize'])
             )
