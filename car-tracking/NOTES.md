@@ -66,4 +66,9 @@ With regard to the blobs / shadow detection, there's not much I can do; What I h
 
 But wait-- let's think. If we were able to suppress shadows, that's most of the overlap problem solved. Overlap isn't due to actually too much overlap, it's just because of long shadows overlapping. 
 
-Yeah, so shadow suppression isn't working. 
+
+21 Nov 2025
+
+Yeah, so shadow suppression isn't working.
+
+I spent a good amount of time restructuring the code. And I have an idea for shadow suppression using LAB thresholing on the fg mask.

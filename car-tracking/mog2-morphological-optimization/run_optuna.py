@@ -1,9 +1,11 @@
 import glob
+import random
 import cv2
 import numpy as np
 import optuna
 from optuna.samplers import TPESampler
 from tqdm import tqdm
+from mog2_pipeline import run_mog2_mse
 video_files = glob.glob("data/*.mp4")
 image_files = glob.glob("data/*_last_frame.png")
 mask_files = glob.glob("data/masks/*_mask.png")
@@ -24,52 +26,7 @@ print("Valid IDs with non-empty masks:", final_ids)
 
 
 
-def run_mog2(id, erode_amount, dilate_amount, gaussian_blur_kernel_size, erode_kernel_size, dilate_kernel_size, history, var_threshold, erode_before_dilate=False):
-    video_path = f"data/{id}.mp4"
-    cap = cv2.VideoCapture(video_path)
 
-    fgbg = cv2.createBackgroundSubtractorMOG2(
-        history=history,     
-        varThreshold=var_threshold,
-        detectShadows=True # detectShadows = true makes it not detect shadows. 
-    )
-
-
-    erode_kernel = cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (erode_kernel_size, erode_kernel_size))
-    dilate_kernel = cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (dilate_kernel_size, dilate_kernel_size))
-
-    while True:
-        ret, frame = cap.read()
-        if not ret:
-            break
-
-        # gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
-        # img = gray
-        img = frame
-        img = cv2.GaussianBlur(img, (gaussian_blur_kernel_size, gaussian_blur_kernel_size), 0)
-
-        
-        mask = fgbg.apply(img)
-
-        mask = mask > 200
-        mask = mask.astype(np.uint8) * 255
-
-        if erode_before_dilate:
-            mask = cv2.erode(mask, erode_kernel, iterations=erode_amount)
-            mask = cv2.dilate(mask, dilate_kernel, iterations=dilate_amount)
-        else:
-            mask = cv2.dilate(mask, dilate_kernel, iterations=dilate_amount)
-            mask = cv2.erode(mask, erode_kernel, iterations=erode_amount)
-
-    cap.release()
-
-    final_mask = mask
-    true_mask = cv2.imread(f"data/masks/{id}_mask.png", cv2.IMREAD_GRAYSCALE)
-    true_mask = true_mask == 255
-    final_mask = final_mask == 255
-
-    mse = np.mean((final_mask.astype(float) - true_mask.astype(float)) ** 2)
-    return mse
 
 def objective(trial):
     erode_amount = trial.suggest_int('erode_amount', 1, 5)
@@ -80,13 +37,15 @@ def objective(trial):
     history = trial.suggest_int('history', 100, 1000)
     var_threshold = trial.suggest_float('var_threshold', 2.0, 50.0)
     erode_before_dilate = trial.suggest_categorical('erode_before_dilate', [True, False])
+    L_ratio_thresh = trial.suggest_float('L_ratio_thresh', 0.1, 5.0)
     
     total_mse = 0.0
     valid_count = 0
     
     for video_id in tqdm(final_ids, leave=False):
         try:
-            mse = run_mog2(
+            # run_mog2(id, erode_amount, dilate_amount, gaussian_blur_kernel_size, erode_kernel_size, dilate_kernel_size, history, var_threshold, erode_before_dilate=False, L_ratio_thresh=1.1, callback=None)
+            mse = run_mog2_mse(
                 video_id, 
                 erode_amount, 
                 dilate_amount, 
@@ -95,7 +54,8 @@ def objective(trial):
                 dilate_kernel_size,
                 history,
                 var_threshold,
-                erode_before_dilate,
+                erode_before_dilate=erode_before_dilate,
+                L_ratio_thresh=L_ratio_thresh
             )
             total_mse += mse
             valid_count += 1
@@ -112,13 +72,27 @@ def objective(trial):
 
 if __name__ == "__main__":
     print(f"Starting optimization with {len(final_ids)} valid videos")
+
+    print("running test...")
+    mse = run_mog2_mse(
+                random.choice(final_ids), 
+                1, 
+                1, 
+                3, 
+                1, 
+                1,
+                100,
+                2.0,
+                erode_before_dilate=False,
+                L_ratio_thresh=1.1
+            )
     
     study = optuna.create_study(
         direction='minimize',
         sampler=TPESampler(seed=42)
     )
     
-    study.optimize(objective, n_trials=200, show_progress_bar=True, n_jobs=4)
+    study.optimize(objective, n_trials=200, show_progress_bar=True, n_jobs=1)
     
     print("\nOptimization completed!")
     print("Best parameters:")
