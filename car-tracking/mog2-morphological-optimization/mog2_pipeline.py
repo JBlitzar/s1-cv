@@ -104,7 +104,6 @@ def run_mog2(id, erode_amount, dilate_amount, gaussian_blur_kernel_size, erode_k
         img = frame
         img = cv2.GaussianBlur(img, (gaussian_blur_kernel_size, gaussian_blur_kernel_size), 0)
 
-        
         mask = fgbg.apply(img)
 
         bg = fgbg.getBackgroundImage()

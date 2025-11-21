@@ -92,7 +92,7 @@ if __name__ == "__main__":
         sampler=TPESampler(seed=42)
     )
     
-    study.optimize(objective, n_trials=200, show_progress_bar=True, n_jobs=1)
+    study.optimize(objective, n_trials=200, show_progress_bar=True, n_jobs=4)
     
     print("\nOptimization completed!")
     print("Best parameters:")
