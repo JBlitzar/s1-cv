@@ -65,3 +65,5 @@ Highway safety: How often do people speed??
 With regard to the blobs / shadow detection, there's not much I can do; What I have right now is good enough™. With some more erosion, we can basically get centroids.
 
 But wait-- let's think. If we were able to suppress shadows, that's most of the overlap problem solved. Overlap isn't due to actually too much overlap, it's just because of long shadows overlapping. 
+
+Yeah, so shadow suppression isn't working. 

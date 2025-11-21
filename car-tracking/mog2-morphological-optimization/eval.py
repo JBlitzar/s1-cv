@@ -4,7 +4,7 @@ import cv2
 import numpy as np
 
 
-def run_mog2_stream(id, erode_amount, dilate_amount, gaussian_blur_kernel_size, erode_kernel_size, dilate_kernel_size, history, var_threshold, erode_before_dilate=False, clipLimit=1.5, tileGridSize=8):
+def run_mog2_stream(id, erode_amount, dilate_amount, gaussian_blur_kernel_size, erode_kernel_size, dilate_kernel_size, history, var_threshold, erode_before_dilate=False):
     video_path = f"data/{id}.mp4"
     cap = cv2.VideoCapture(video_path)
 
@@ -23,7 +23,7 @@ def run_mog2_stream(id, erode_amount, dilate_amount, gaussian_blur_kernel_size, 
         if not ret:
             break
 
-        # gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
+        gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
         img = frame
         img = cv2.GaussianBlur(img, (gaussian_blur_kernel_size, gaussian_blur_kernel_size), 0)
 
@@ -44,7 +44,7 @@ def run_mog2_stream(id, erode_amount, dilate_amount, gaussian_blur_kernel_size, 
         
         alpha = 0.5  # transparency level (0 = invisible, 1 = fully red)
 
-        superimposed = img.copy().astype(np.float32)
+        superimposed = gray.copy().astype(np.float32)
         superimposed /= np.max(superimposed) + 1e-10
         superimposed *= 255.0
         superimposed = superimposed.astype(np.uint8)
@@ -105,6 +105,4 @@ if __name__ == "__main__":
                 int(params['history']),
                 float(params['var_threshold']),
                 bool(params['erode_before_dilate']),
-                float(params['clipLimit']),
-                int(params['tileGridSize'])
             )

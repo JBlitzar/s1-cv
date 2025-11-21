@@ -1,12 +1,10 @@
 Best parameters:
   erode_amount: 1
-  dilate_amount: 3
+  dilate_amount: 2
   gaussian_blur_kernel_size: 5
-  erode_kernel_size: 3
-  dilate_kernel_size: 3
-  history: 396
-  var_threshold: 49.93206832472559
+  erode_kernel_size: 15
+  dilate_kernel_size: 9
+  history: 753
+  var_threshold: 41.99110068589437
   erode_before_dilate: False
-  clipLimit: 0.8674347691599866
-  tileGridSize: 4
-Best MSE: 0.038957
+Best MSE: 0.037958

@@ -70,7 +70,7 @@ def run_mog2_stream(id, erode_amount, dilate_amount, gaussian_blur_kernel_size, 
             if not ret:
                 break
 
-        # gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
+        gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
         img = frame
         img = cv2.GaussianBlur(img, (gaussian_blur_kernel_size, gaussian_blur_kernel_size), 0)
         mask = fgbg.apply(img)
@@ -89,7 +89,7 @@ def run_mog2_stream(id, erode_amount, dilate_amount, gaussian_blur_kernel_size, 
         cv2.imshow("Raw Frame", frame)
         cv2.imshow("Processed Frame", img)
         cv2.imshow("Motion Mask", mask)
-        superimposed = img.copy()
+        superimposed = gray.copy()
         superimposed = np.float32(superimposed)
         superimposed /= np.max(superimposed) + 1e-10
         superimposed *= 255.0
@@ -174,6 +174,4 @@ if __name__ == "__main__":
                 int(params['history']),
                 float(params['var_threshold']),
                 bool(params['erode_before_dilate']),
-                float(params['clipLimit']),
-                int(params['tileGridSize'])
             )
