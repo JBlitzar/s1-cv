@@ -130,7 +130,10 @@ def run_mog2(
 
         a = L_ratio > L_ratio_thresh
 
-        # mask = mask & a
+        a = a.astype(bool)
+        mask = mask.astype(bool)
+
+        mask = mask & a
         mask = mask.astype(np.uint8)
 
         if erode_before_dilate:
@@ -150,13 +153,14 @@ def run_mog2(
 
 def run_mog2_mse(id, *args, **kwargs):
     mask = run_mog2(id, *args, **kwargs)
-    final_mask = mask
+    final_mask = mask.astype(float) / np.max(mask.astype(float) + 1e-10)
     true_mask = cv2.imread(f"data/masks/{id}_mask.png", cv2.IMREAD_GRAYSCALE)
     true_mask = true_mask == 255
-    # print(true_mask)
+    # print(np.mean(true_mask.astype(float)))
+    # print(np.mean(final_mask))
 
     mse = np.mean(
-        (final_mask.astype(float) - true_mask.astype(float)) ** 2
+        (final_mask - true_mask.astype(float)) ** 2
     )  # uh I guess all this is doing is just counting pixel deviations since it's a binary mask
     return mse
 
