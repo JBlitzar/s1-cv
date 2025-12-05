@@ -66,3 +66,14 @@ I spent a good amount of time restructuring the code. And I have an idea for sha
 3 dec 2025
 Implemented a rudimentary car timeseries tracking in subdirectory `timeseries-tracking`.
 Talked with wes about this insane algorithm strategy to cope with blobs. Basically, you have a blob class and you update a list of blobs. Each blob has an x,y,+ delta vector. So you see. If there are pixels in the next frame's mask of where that blob is + the delta vector, then update the blob to be the intersection there. That way if the next thing is bigger it still works. Conversely, if blob is split down the line, then split it. Then always use these processed blobs to look at the next frame, and the next.
+
+
+5 dec 2025
+
+So I did that basically and it worked (pretty well!) I guess now time to see what I want to do with that. Let's see how to track speeding and do it for an extended period (livestreams currently kind of drop 🥶)
+
+Let's see... 
+
+A car is 4.5 m long according to google™. 
+
+Dimensional analysis: https://www.desmos.com/calculator/lz3zqirmao
