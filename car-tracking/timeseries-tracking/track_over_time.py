@@ -36,9 +36,35 @@ class Blob:
     x: float
     y: float
     radius: float
-
+    dx: float = 0.0
+    dy: float = 0.0
     distances: list = field(default_factory=list)
     radii: list = field(default_factory=list)
+
+
+SEARCH_PADDING = 2
+MIN_RADIUS = 5.0
+
+
+def _boxes_intersect(a, b):
+    ax1, ay1, ax2, ay2 = a
+    bx1, by1, bx2, by2 = b
+    return ax1 < bx2 and ax2 > bx1 and ay1 < by2 and ay2 > by1
+
+
+def _intersection_blob(label_id, labels, bbox):
+    x1, y1, x2, y2 = bbox
+    x1, y1 = int(max(0, x1)), int(max(0, y1))
+    x2, y2 = int(min(labels.shape[1], x2)), int(min(labels.shape[0], y2))
+    roi = labels[y1:y2, x1:x2]
+    mask = roi == label_id
+    if not mask.any():
+        return None
+    ys, xs = np.nonzero(mask)
+    cx = x1 + xs.mean()
+    cy = y1 + ys.mean()
+    radius = np.sqrt(mask.sum() / np.pi)
+    return cx, cy, radius
 
 
 def tracking_callback(frame, gray, mask, img, bg, L_ratio):
@@ -47,49 +73,91 @@ def tracking_callback(frame, gray, mask, img, bg, L_ratio):
     num_labels, labels, stats, centroids = cv2.connectedComponentsWithStats(
         mask, connectivity=8
     )
-    _blobs = []
+    detections = []
     for i in range(1, num_labels):
         x, y, w, h, area = stats[i]
         cx, cy = centroids[i]
-
+        radius = min(w, h) / 2
+        if radius < MIN_RADIUS:
+            continue
         cv2.rectangle(frame, (x, y), (x + w, y + h), (0, 255, 0), 2)
         cv2.circle(frame, (int(cx), int(cy)), 5, (0, 0, 255), -1)
-        _blobs.append(Blob(cx, cy, min(w, h) / 2, distances=[]))
-    if len(blobList) == 0:
-        blobList = _blobs
-        for blob in blobList:
-            blob.radii = [blob.radius]
-    if len(blobList) > 0:
-        newBlobs = []
-        for blob in _blobs:
-            closest_blob = min(
-                blobList,
-                key=lambda b: (b.x - blob.x) ** 2 + (b.y - blob.y) ** 2,
-            )
-            cv2.line(
-                frame,
-                (int(blob.x), int(blob.y)),
-                (int(closest_blob.x), int(closest_blob.y)),
-                (255, 0, 0),
-                2,
-            )
+        detections.append(
+            {
+                "label": i,
+                "bbox": (x, y, x + w, y + h),
+                "matched": False,
+                "blob": Blob(cx, cy, radius),
+            }
+        )
 
-            distance = np.sqrt(
-                (blob.x - closest_blob.x) ** 2 + (blob.y - closest_blob.y) ** 2
-            )
-            blob.distances.extend(closest_blob.distances)
-            blob.distances.append(distance)
+    
+    mask_colored = cv2.applyColorMap(mask.astype(np.uint8) * 255, cv2.COLORMAP_BONE)
+    frame = cv2.addWeighted(frame, 0.7, mask_colored, 0.3, 0)
 
-            blob.radii.extend(closest_blob.radii)
-            blob.radii.append(blob.radius)
+    blobList = [blob for blob in blobList if blob.radius >= MIN_RADIUS]
 
-            newBlobs.append(blob)
-        blobList = newBlobs
-        # print(blobList)
+    if not blobList:
+        blobList = []
+        for det in detections:
+            det_blob = det["blob"]
+            det_blob.radii = [det_blob.radius]
+            blobList.append(det_blob)
 
-        for blob in blobList:
-            avg_distance = sum(blob.distances) / len(blob.distances)
-            avg_radius = sum(blob.radii) / len(blob.radii)
+    updated = []
+    for blob in blobList:
+        pred_x = blob.x + blob.dx
+        pred_y = blob.y + blob.dy
+        pred_bbox = (
+            pred_x - blob.radius - SEARCH_PADDING,
+            pred_y - blob.radius - SEARCH_PADDING,
+            pred_x + blob.radius + SEARCH_PADDING,
+            pred_y + blob.radius + SEARCH_PADDING,
+        )
+        candidates = [
+            idx
+            for idx, det in enumerate(detections)
+            if (not det["matched"]) and _boxes_intersect(pred_bbox, det["bbox"])
+        ]
+
+        for idx in candidates:
+            det = detections[idx]
+            intersection = _intersection_blob(det["label"], labels, pred_bbox)
+            if intersection is None:
+                continue
+            nx, ny, nr = intersection
+            if nr < MIN_RADIUS:
+                continue
+            det["matched"] = True
+            new_blob = Blob(nx, ny, nr)
+            new_blob.dx = nx - blob.x
+            new_blob.dy = ny - blob.y
+            new_blob.distances = blob.distances.copy()
+            new_blob.distances.append(np.hypot(new_blob.dx, new_blob.dy))
+            new_blob.radii = blob.radii.copy()
+            new_blob.radii.append(nr)
+            updated.append(new_blob)
+
+
+       
+
+    for det in detections:
+        if det["matched"]:
+            continue
+        det_blob = det["blob"]
+        det_blob.radii = [det_blob.radius]
+        updated.append(det_blob)
+
+    blobList = updated
+    
+    for blob in blobList:
+        start_point = (int(blob.x - blob.dx), int(blob.y - blob.dy))
+        end_point = (int(blob.x), int(blob.y))
+        
+        avg_distance = sum(blob.distances) / len(blob.distances) if blob.distances else 0.0
+        avg_radius = sum(blob.radii) / len(blob.radii) if blob.radii else 0.0
+        if avg_distance > 0.0 and avg_radius > 0.0 and blob.dx != 0.0 and blob.dy != 0.0:
+            cv2.arrowedLine(frame, start_point, end_point, (255, 0, 0), 2)
             cv2.putText(
                 frame,
                 f"D: {avg_distance:.1f}, R: {avg_radius:.1f}",
@@ -99,6 +167,7 @@ def tracking_callback(frame, gray, mask, img, bg, L_ratio):
                 (255, 255, 0),
                 2,
             )
+            # print(blob)
 
     cv2.imshow("Tracking", frame)
     cv2.waitKey(1000 // 10)
