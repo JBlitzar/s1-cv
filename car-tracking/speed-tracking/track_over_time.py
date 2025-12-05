@@ -6,7 +6,7 @@ import numpy as np
 from mog2_pipeline import run_mog2
 import subprocess
 from dataclasses import dataclass, field
-
+import time
 
 def load_params():
     with open("best.txt", "r") as f:
@@ -47,6 +47,17 @@ SEARCH_PADDING = 2
 MIN_RADIUS = 5.0
 RADIUS_SMOOTHING = 0.5
 
+global LAST_TIME
+
+LAST_TIME = time.time()
+
+MPH_TO_WPS = 1609 / 3600 * 1 / 4.5 # cars are about 4.5 meters long
+
+WPS_TO_MPH = 1 / MPH_TO_WPS
+
+# https://www.desmos.com/calculator/lz3zqirmao
+WIDTHS_PER_SECOND = 6.45586419753 # if a car moves 6x its own length in one second, it's going about 65 mph
+
 # disclaimer: after the algorithm description that I made in the NOTES.md, I asked AI (claude sonnet 4) to implement a scaffolding that I then heavily modified.
 def _boxes_intersect(a, b):
     ax1, ay1, ax2, ay2 = a
@@ -70,6 +81,7 @@ def _intersection_blob(label_id, labels, bbox):
 
 
 def tracking_callback(frame, gray, mask, img, bg, L_ratio):
+    global LAST_TIME
     _min_radius = float(MIN_RADIUS) / 300 * frame.shape[1]
 
     frame = frame.copy()
@@ -177,8 +189,29 @@ def tracking_callback(frame, gray, mask, img, bg, L_ratio):
             # )
             # print(blob)
 
+
+            dt = time.time() - LAST_TIME
+            avg_distance_per_second = avg_distance / dt if dt > 0 else 0.0
+            widths_per_second = avg_distance_per_second / (2 * avg_radius)
+
+            speed_mph = widths_per_second * WPS_TO_MPH
+            print(speed_mph)
+
+            if speed_mph > 30.0:
+                cv2.putText(
+                    frame,
+                    f"Speed: {speed_mph:.1f} mph",
+                    (int(blob.x + 10), int(blob.y + 25)),
+                    cv2.FONT_HERSHEY_SIMPLEX,
+                    0.7,
+                    (0, 0, 255),
+                    2,
+                )
+    LAST_TIME = time.time()
+
+
     cv2.imshow("Tracking", frame)
-    cv2.waitKey(1000 // 10)
+    cv2.waitKey(1000 // 30)
 
 
 if __name__ == "__main__":
