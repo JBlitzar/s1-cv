@@ -203,7 +203,7 @@ def tracking_callback(frame, gray, mask, img, bg, L_ratio):
                     f"Speed: {speed_mph:.1f} mph",
                     (int(blob.x + 10), int(blob.y + 25)),
                     cv2.FONT_HERSHEY_SIMPLEX,
-                    0.7,
+                    0.3,
                     (0, 0, 255),
                     2,
                 )
@@ -211,7 +211,7 @@ def tracking_callback(frame, gray, mask, img, bg, L_ratio):
 
 
     cv2.imshow("Tracking", frame)
-    cv2.waitKey(1000 // 30)
+    cv2.waitKey(1000 // 60)
 
 
 if __name__ == "__main__":

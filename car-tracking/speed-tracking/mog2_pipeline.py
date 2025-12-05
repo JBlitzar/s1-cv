@@ -3,6 +3,8 @@ import cv2
 import numpy as np
 from get_videos import urls
 import subprocess
+import os
+import select
 
 
 def _get_stream_info(url):
@@ -22,6 +24,56 @@ def _get_stream_info(url):
     return 1920, 1080
 
 
+def _start_stream_process(url):
+    width, height = _get_stream_info(url)
+    ffmpeg_cmd = [
+        "ffmpeg",
+        "-reconnect",
+        "1",
+        "-reconnect_streamed",
+        "1",
+        "-reconnect_delay_max",
+        "5",
+        "-nostats",
+        "-loglevel",
+        "error",
+        "-fflags",
+        "nobuffer",
+        "-flags",
+        "low_delay",
+        "-i",
+        url,
+        "-f",
+        "rawvideo",
+        "-pix_fmt",
+        "bgr24",
+        "-an",
+        "-",
+    ]
+    process = subprocess.Popen(
+        ffmpeg_cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE, bufsize=10**8
+    )
+    return process, width, height
+
+
+def _read_stream_frame(ffmpeg_process, width, height, timeout):
+    if ffmpeg_process.stdout is None:
+        return None
+    expected = width * height * 3
+    ready, _, _ = select.select([ffmpeg_process.stdout.fileno()], [], [], timeout)
+    if not ready:
+        return None
+    data = bytearray()
+    while len(data) < expected:
+        chunk = os.read(ffmpeg_process.stdout.fileno(), expected - len(data))
+        if not chunk:
+            break
+        data.extend(chunk)
+    if len(data) != expected:
+        return None
+    return bytes(data)
+
+
 def run_mog2(
     id,
     erode_amount,
@@ -34,6 +86,8 @@ def run_mog2(
     erode_before_dilate=False,
     L_ratio_thresh=1.1,
     callback=None,
+    max_stream_restarts=5,
+    stream_read_timeout=5.0,
 ):
     # print("ARGS: ")
     # print(f"id: {id}")
@@ -49,27 +103,13 @@ def run_mog2(
     # print(f"callback: {callback}")
     video_path = ""
 
+    ffmpeg_process = None
+    cap = None
+
     if isinstance(id, int) and 0 <= id < len(urls):
         url = urls[id]
-
-        width, height = _get_stream_info(url)
-
-        ffmpeg_cmd = [
-            "ffmpeg",
-            "-i",
-            url,
-            "-f",
-            "rawvideo",
-            "-pix_fmt",
-            "bgr24",
-            "-an",
-            "-",
-        ]
-
-        ffmpeg_process = subprocess.Popen(
-            ffmpeg_cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE, bufsize=10**8
-        )
-
+        ffmpeg_process, width, height = _start_stream_process(url)
+        restart_attempts = 0
         is_stream = True
     else:
         video_path = f"data/{id}.mp4"
@@ -92,12 +132,18 @@ def run_mog2(
     mask = None
     while True:
         if is_stream:
-            raw_frame = ffmpeg_process.stdout.read(width * height * 3)
-            if len(raw_frame) != width * height * 3:
-                break
-
-            frame = np.frombuffer(raw_frame, dtype=np.uint8)
-            frame = frame.reshape((height, width, 3))
+            raw_frame = _read_stream_frame(ffmpeg_process, width, height, stream_read_timeout)
+            if raw_frame is None:
+                restart_attempts += 1
+                if restart_attempts > max_stream_restarts:
+                    break
+                if ffmpeg_process:
+                    ffmpeg_process.kill()
+                    ffmpeg_process.wait()
+                ffmpeg_process, width, height = _start_stream_process(url)
+                continue
+            restart_attempts = 0
+            frame = np.frombuffer(raw_frame, dtype=np.uint8).reshape((height, width, 3))
             ret = True
         else:
             ret, frame = cap.read()
@@ -146,7 +192,15 @@ def run_mog2(
         if callback is not None:
             callback(frame, gray, mask, img, bg, L_ratio)
 
-    cap.release()
+    if cap is not None:
+        cap.release()
+    if ffmpeg_process is not None:
+        ffmpeg_process.kill()
+        ffmpeg_process.stdout.close()
+        ffmpeg_process.stderr.close()
+
+    if mask is None:
+        mask = np.zeros((1, 1), dtype=np.uint8)
 
     return mask
 
