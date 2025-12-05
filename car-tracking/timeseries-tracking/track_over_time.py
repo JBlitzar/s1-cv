@@ -45,7 +45,7 @@ class Blob:
 SEARCH_PADDING = 2
 MIN_RADIUS = 5.0
 
-
+# disclaimer: after the algorithm description that I made in the NOTES.md, I asked AI (claude sonnet 4) to implement a scaffolding that I then heavily modified.
 def _boxes_intersect(a, b):
     ax1, ay1, ax2, ay2 = a
     bx1, by1, bx2, by2 = b
