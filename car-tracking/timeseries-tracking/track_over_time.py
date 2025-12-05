@@ -1,5 +1,6 @@
 import random
 from run_optuna import final_ids
+from get_videos import urls
 import cv2
 import numpy as np
 from mog2_pipeline import run_mog2
@@ -44,6 +45,7 @@ class Blob:
 
 SEARCH_PADDING = 2
 MIN_RADIUS = 5.0
+RADIUS_SMOOTHING = 0.5
 
 # disclaimer: after the algorithm description that I made in the NOTES.md, I asked AI (claude sonnet 4) to implement a scaffolding that I then heavily modified.
 def _boxes_intersect(a, b):
@@ -68,6 +70,8 @@ def _intersection_blob(label_id, labels, bbox):
 
 
 def tracking_callback(frame, gray, mask, img, bg, L_ratio):
+    _min_radius = float(MIN_RADIUS) / 300 * frame.shape[1]
+
     frame = frame.copy()
     global blobList
     num_labels, labels, stats, centroids = cv2.connectedComponentsWithStats(
@@ -77,8 +81,8 @@ def tracking_callback(frame, gray, mask, img, bg, L_ratio):
     for i in range(1, num_labels):
         x, y, w, h, area = stats[i]
         cx, cy = centroids[i]
-        radius = min(w, h) / 2
-        if radius < MIN_RADIUS:
+        radius = max(_min_radius, np.sqrt(area / np.pi))
+        if radius < _min_radius:
             continue
         cv2.rectangle(frame, (x, y), (x + w, y + h), (0, 255, 0), 2)
         cv2.circle(frame, (int(cx), int(cy)), 5, (0, 0, 255), -1)
@@ -95,7 +99,7 @@ def tracking_callback(frame, gray, mask, img, bg, L_ratio):
     mask_colored = cv2.applyColorMap(mask.astype(np.uint8) * 255, cv2.COLORMAP_BONE)
     frame = cv2.addWeighted(frame, 0.7, mask_colored, 0.3, 0)
 
-    blobList = [blob for blob in blobList if blob.radius >= MIN_RADIUS]
+    blobList = [blob for blob in blobList if blob.radius >= _min_radius]
 
     if not blobList:
         blobList = []
@@ -126,16 +130,19 @@ def tracking_callback(frame, gray, mask, img, bg, L_ratio):
             if intersection is None:
                 continue
             nx, ny, nr = intersection
-            if nr < MIN_RADIUS:
+            if nr < _min_radius:
                 continue
             det["matched"] = True
-            new_blob = Blob(nx, ny, nr)
+            blended_radius = max(
+                _min_radius, RADIUS_SMOOTHING * nr + (1 - RADIUS_SMOOTHING) * blob.radius
+            )
+            new_blob = Blob(nx, ny, blended_radius)
             new_blob.dx = nx - blob.x
             new_blob.dy = ny - blob.y
             new_blob.distances = blob.distances.copy()
             new_blob.distances.append(np.hypot(new_blob.dx, new_blob.dy))
             new_blob.radii = blob.radii.copy()
-            new_blob.radii.append(nr)
+            new_blob.radii.append(blended_radius)
             updated.append(new_blob)
 
 
@@ -158,15 +165,16 @@ def tracking_callback(frame, gray, mask, img, bg, L_ratio):
         avg_radius = sum(blob.radii) / len(blob.radii) if blob.radii else 0.0
         if avg_distance > 0.0 and avg_radius > 0.0 and blob.dx != 0.0 and blob.dy != 0.0:
             cv2.arrowedLine(frame, start_point, end_point, (255, 0, 0), 2)
-            cv2.putText(
-                frame,
-                f"D: {avg_distance:.1f}, R: {avg_radius:.1f}",
-                (int(blob.x + 10), int(blob.y - 10)),
-                cv2.FONT_HERSHEY_SIMPLEX,
-                0.5,
-                (255, 255, 0),
-                2,
-            )
+            cv2.circle(frame, end_point, int(avg_radius), (0, 255, 255), 2)
+            # cv2.putText(
+            #     frame,
+            #     f"D: {avg_distance:.1f}, R: {avg_radius:.1f}",
+            #     (int(blob.x + 10), int(blob.y - 10)),
+            #     cv2.FONT_HERSHEY_SIMPLEX,
+            #     0.5,
+            #     (255, 255, 0),
+            #     2,
+            # )
             # print(blob)
 
     cv2.imshow("Tracking", frame)
@@ -177,8 +185,9 @@ if __name__ == "__main__":
     params = load_params()
     # video_id = random.choice(final_ids)
     run_mog2(
-        # 0,
-        "5bd8fa3e-2ed9-40f7-b47a-04e65210a9f3",
+        #0,
+        random.randint(0, len(urls) - 1),
+        #"5bd8fa3e-2ed9-40f7-b47a-04e65210a9f3",
         int(params["erode_amount"]),
         int(params["dilate_amount"]),
         int(params["gaussian_blur_kernel_size"]),
