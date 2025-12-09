@@ -3,9 +3,17 @@
 Attempt to count / determine other statistics using the [california traffic cameras](https://cwwp2.dot.ca.gov/vm/iframemap.htm)
 
 
-| Video 1 | Video 2 |
-|---------|---------|
-| <img src="docs/demo-tracking1.webp"> | <img src="docs/tracking3.webp"> |
+
+<table width="100%">
+    <tr>
+        <td width="50%">
+            <img src="docs/demo-tracking1.webp" width="100%">
+        </td>
+        <td width="50%">
+            <img src="docs/tracking3.webp" width="100%">
+        </td>
+    </tr>
+</table>
 
 
 <!-- https://github.com/user-attachments/assets/109d3529-cd21-4093-b0df-d841a5fc4fb7
