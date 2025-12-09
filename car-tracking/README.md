@@ -1,3 +1,14 @@
 # car tracking
 
 Attempt to count / determine other statistics using the [california traffic cameras](https://cwwp2.dot.ca.gov/vm/iframemap.htm)
+
+
+
+
+
+https://github.com/user-attachments/assets/253715f1-9b38-43b9-beb4-6a1afa8b5014
+
+
+
+https://github.com/user-attachments/assets/3e3327ac-35e9-470f-85f9-3c12449f6db7
+
