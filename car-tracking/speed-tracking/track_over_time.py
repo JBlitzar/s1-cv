@@ -217,9 +217,11 @@ def tracking_callback(frame, gray, mask, img, bg, L_ratio):
 if __name__ == "__main__":
     params = load_params()
     # video_id = random.choice(final_ids)
+    idx =random.randint(0, len(urls) - 1)
+    print(idx)
     run_mog2(
-        #0,
-        random.randint(0, len(urls) - 1),
+        0,
+        #idx,
         #"5bd8fa3e-2ed9-40f7-b47a-04e65210a9f3",
         int(params["erode_amount"]),
         int(params["dilate_amount"]),
