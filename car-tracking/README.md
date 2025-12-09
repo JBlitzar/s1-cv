@@ -4,13 +4,13 @@ Attempt to count / determine other statistics using the [california traffic came
 
 
 
-<table width="100vw">
+<table width="100%">
     <tr>
-        <td width="50vw">
-            <img src="docs/demo-tracking1.webp" width="50vw">
+        <td width="50%">
+            <img src="docs/demo-tracking1.webp" width="100%">
         </td>
-        <td width="50vw">
-            <img src="docs/tracking3.webp" width="50vw">
+        <td width="50%">
+            <img src="docs/tracking3.webp" width="100%">
         </td>
     </tr>
 </table>
