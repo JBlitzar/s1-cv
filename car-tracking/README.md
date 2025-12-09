@@ -22,7 +22,7 @@ I've documented my process extensively in [NOTES.md](NOTES.md). Overall, this pr
     - After iterating on this system until I was able to reliably mask cars, there's a second big problem to face. Occlusion. I empirically discovered that it's mostly impossible to reliably suppress shadows (*after all, how do you programmatically distinguish between a shadow and a black car without explicitly encoding the shape of the car?*), so this means that cars often overlap (because a shadow might touch a car in the next lane). This means that greedily picking the blob with the closest pixel coordinates the next frame isn't going to cut it. Instead, I keep track of every detection and take advantage of the fact that cars mostly don't change direction when driving to track blobs, even when they merge or split, using a frame horizon of only 1. 
 
 If you plan on understanding the code and looking through it, I reccommend you jump straight to the [speed-tracking](speed-tracking) subdirectory (where all the final code is stored). 
-- File structure
+- File structure within `speed-tracking`
     - `get_videos.py`: scraping logic, URLs list
     - `mog2_pipeline.py`: Algorithm logic cars from the video stream using MOG2. 
     - `run_optuna.py`: Orchestration code to run optuna to find the best morphological parameters. Best parameters are stored in `best.txt`.
