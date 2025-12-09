@@ -1,5 +1,5 @@
 import random
-from run_optuna import final_ids
+from run_optuna import final_ids  # noqa: F401
 from get_videos import urls
 import cv2
 import numpy as np
@@ -7,6 +7,8 @@ from mog2_pipeline import run_mog2
 import subprocess
 from dataclasses import dataclass, field
 import time
+import os
+
 
 def load_params():
     with open("best.txt", "r") as f:
@@ -30,6 +32,9 @@ def load_params():
 
 global blobList
 blobList = []
+
+global writer
+writer = None
 
 
 @dataclass
@@ -96,8 +101,8 @@ def tracking_callback(frame, gray, mask, img, bg, L_ratio):
         radius = max(_min_radius, np.sqrt(area / np.pi))
         if radius < _min_radius:
             continue
-        cv2.rectangle(frame, (x, y), (x + w, y + h), (0, 255, 0), 2)
-        cv2.circle(frame, (int(cx), int(cy)), 5, (0, 0, 255), -1)
+        # cv2.rectangle(frame, (x, y), (x + w, y + h), (0, 255, 0), 2)
+        # cv2.circle(frame, (int(cx), int(cy)), 5, (0, 0, 255), -1)
         detections.append(
             {
                 "label": i,
@@ -211,7 +216,19 @@ def tracking_callback(frame, gray, mask, img, bg, L_ratio):
 
 
     cv2.imshow("Tracking", frame)
-    cv2.waitKey(1000 // 60)
+
+    if cv2.waitKey(1000 // 60)  & 0xFF == ord('q'):
+        return
+    global writer
+    if writer is None:
+        writer = cv2.VideoWriter(
+            'output.mp4',
+            cv2.VideoWriter_fourcc(*'mp4v'),
+            30,
+            (frame.shape[1], frame.shape[0])
+        )
+    writer.write(frame)
+
 
 
 if __name__ == "__main__":
@@ -219,18 +236,36 @@ if __name__ == "__main__":
     # video_id = random.choice(final_ids)
     idx =random.randint(0, len(urls) - 1)
     print(idx)
-    run_mog2(
-        0,
-        #idx,
-        #"5bd8fa3e-2ed9-40f7-b47a-04e65210a9f3",
-        int(params["erode_amount"]),
-        int(params["dilate_amount"]),
-        int(params["gaussian_blur_kernel_size"]),
-        int(params["erode_kernel_size"]),
-        int(params["dilate_kernel_size"]),
-        int(params["history"]),
-        float(params["var_threshold"]),
-        bool(params["erode_before_dilate"]),
-        float(params["L_ratio_thresh"]),
-        callback=tracking_callback,
-    )
+    try:
+        run_mog2(
+            0,
+            #idx,
+            #"5bd8fa3e-2ed9-40f7-b47a-04e65210a9f3",
+            int(params["erode_amount"]),
+            int(params["dilate_amount"]),
+            int(params["gaussian_blur_kernel_size"]),
+            int(params["erode_kernel_size"]),
+            int(params["dilate_kernel_size"]),
+            int(params["history"]),
+            float(params["var_threshold"]),
+            bool(params["erode_before_dilate"]),
+            float(params["L_ratio_thresh"]),
+            callback=tracking_callback,
+        )
+    except KeyboardInterrupt:
+        pass
+    print("Exiting...")
+    cv2.destroyAllWindows()
+    # flush frames to video
+    if writer is not None:
+        writer.release()
+
+    subprocess.run([
+        'ffmpeg', '-i', 'output.mp4', '-vcodec', 'libx264', '-crf', '23',
+        '-y', 'output_compressed.mp4'
+    ], check=True)
+    os.remove('output.mp4')
+    print("Done.")
+
+
+
