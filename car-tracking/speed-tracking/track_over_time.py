@@ -9,7 +9,7 @@ from dataclasses import dataclass, field
 import time
 import os
 
-
+# helper function to load best parameters from best.txt
 def load_params():
     with open("best.txt", "r") as f:
         lines = f.readlines()
@@ -64,12 +64,13 @@ WPS_TO_MPH = 1 / MPH_TO_WPS
 WIDTHS_PER_SECOND = 6.45586419753 # if a car moves 6x its own length in one second, it's going about 65 mph
 
 # disclaimer: after the algorithm description that I made in the NOTES.md, I asked AI (claude sonnet 4) to implement a scaffolding that I then heavily modified.
+# small helper function
 def _boxes_intersect(a, b):
     ax1, ay1, ax2, ay2 = a
     bx1, by1, bx2, by2 = b
     return ax1 < bx2 and ax2 > bx1 and ay1 < by2 and ay2 > by1
 
-
+# helper function to get blob intersection
 def _intersection_blob(label_id, labels, bbox):
     x1, y1, x2, y2 = bbox
     x1, y1 = int(max(0, x1)), int(max(0, y1))
@@ -84,7 +85,7 @@ def _intersection_blob(label_id, labels, bbox):
     radius = np.sqrt(mask.sum() / np.pi)
     return cx, cy, radius
 
-
+# Main algorithm!! + nice visuals for video
 def tracking_callback(frame, gray, mask, img, bg, L_ratio):
     global LAST_TIME
     _min_radius = float(MIN_RADIUS) / 300 * frame.shape[1]
@@ -265,7 +266,7 @@ if __name__ == "__main__":
         '-y', 'output_compressed.mp4'
     ], check=True)
     os.remove('output.mp4')
-    print("Done.")
+    print("Done.") # this is how I generated the videos in the README
 
 
 

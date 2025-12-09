@@ -6,6 +6,11 @@ import optuna
 from optuna.samplers import TPESampler
 from tqdm import tqdm
 from mog2_pipeline import run_mog2_mse
+
+# pretty small script to run Optuna morphological optimization and save best parameters to best.txt
+# relatively short script, main work is in mog2_pipeline.py
+
+
 video_files = glob.glob("data/*.mp4")
 image_files = glob.glob("data/*_last_frame.png")
 mask_files = glob.glob("data/masks/*_mask.png")

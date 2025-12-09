@@ -4,6 +4,7 @@ import uuid
 
 
 def save_5s(url):
+    # given m3u8 url, save 5 seconds of video and last frame as png (data acquisition for labeling)
     id = str(uuid.uuid4())
     print("Processing URL:", url, "with ID:", id)
     # download video
@@ -62,7 +63,7 @@ def save_5s(url):
     )
 
 
-# commented returns 404 ??
+# commented returns 404 ?? or some of them are just bad.
 urls = [
     # "https://wzmedia.dot.ca.gov/D4/S280_on_Monterey_Bl.stream/playlist.m3u8",
     # "https://wzmedia.dot.ca.gov/D4/N280_at_Indiana_St.stream/playlist.m3u8",
