@@ -19,11 +19,12 @@ I've documented my process extensively in [NOTES.md](NOTES.md). Overall, this pr
 
 ## Installation / How to Run This Yourself
 
-- Git clone et al, cd `speed-tracking`
-- `cd timeseries-tracking && uv sync`
-- `uv run track_over_time.py`
+- `git clone https://github.com/JBlitzar/s1-cv.git` *git clone*
+- `cd s1-cv/speed-tracking` *project root*
+- `cd timeseries-tracking && uv sync` *final code subdirectory, sync dependencies*
+- `uv run track_over_time.py` *run main script*
 
-If you want to run something else, then figure out what you want to run and `uv run` it
+This should load up a CalTrans livestream and start tracking cars in real time. Yellow circles represent car detections. Blue lines represent movement vectors. The light gray mask represents the detection mask. 
 
 # Info
 
