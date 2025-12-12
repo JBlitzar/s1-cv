@@ -19,6 +19,8 @@ I've documented my process extensively in [NOTES.md](NOTES.md). Overall, this pr
 
 ## Installation / How to Run This Yourself
 
+Make sure to install [uv](https://docs.astral.sh/uv/getting-started/installation/) first! If you don't wish to do that, aim your favorite package manager at the [pyproject.toml](/pyproject.toml) at the repository root
+
 - `git clone https://github.com/JBlitzar/s1-cv.git` *git clone*
 - `cd s1-cv/speed-tracking` *project root*
 - `cd timeseries-tracking && uv sync` *final code subdirectory, sync dependencies*
